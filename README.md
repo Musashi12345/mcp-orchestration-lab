@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # MCP Execution Lab
 
 A CSV data-analysis research application. Give it a question and CSV files; its planner
@@ -100,3 +101,6 @@ See [the saved results](reports/csv_cleanup_2026-10-23/README.md).
 - [Original reference guide](docs/reference/Execution_Engine_Research_App_Build_Guide.md)
 
 No employer source or proprietary data belongs in this independent project.
+=======
+# mcp-orchestration-lab
+>>>>>>> origin/main
