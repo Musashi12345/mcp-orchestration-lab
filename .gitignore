@@ -1,0 +1,83 @@
+# Local Python environments, downloaded tools, and package caches
+.venv/
+venv/
+env/
+ENV/
+.python/
+.tools/
+.uv-cache/
+.cache/
+__pycache__/
+*.py[cod]
+
+# Packaging output; keep pyproject.toml and uv.lock versioned
+build/
+dist/
+.eggs/
+*.egg-info/
+*.whl
+
+# Test, lint, type-check, and coverage output
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+/test-results/
+
+# Local credentials and machine-specific configuration; keep example templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+/credentials*.json
+/secrets*.json
+/configs/*.local.yaml
+/configs/*.local.yml
+
+# Generated run evidence and user data stay on disk, outside normal commits.
+# Keep source, docs, configs, and synthetic fixtures versioned.
+/.runtime/
+/runs/
+/batches/
+/reports/
+/data/
+/uploads/
+/outputs/
+/artifacts/
+/backups/
+/dumps/
+
+# Local databases, journals, service records, and logs
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.duckdb
+*.pid
+*.pid.lock
+*.log
+
+# Editor, OS, and temporary files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*.tmp
+*.temp
+*~

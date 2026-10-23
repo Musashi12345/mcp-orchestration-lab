@@ -1,0 +1,105 @@
+{
+  "audit_date": "2026-10-23",
+  "date_basis": "User client date, Asia/Calcutta",
+  "source_sha256": "a5f846f0795a441ef71a040f14e4292a17e64ae462fe8a7bb009fcd2cf0d0812",
+  "lock_sha256": "370815fd093cab98c60f63b3f529b2c0a27b339105c9795743217ec6ce14ef53",
+  "full_check": {
+    "entrypoint": "scripts/check.ps1",
+    "exit_code": 0,
+    "ruff_lint": "PASSED",
+    "ruff_format": "PASSED: 120 Python files",
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "environment_overrides": {
+      "MCP_LAB_POSTGRES_TEST": "1",
+      "MCP_LAB_DOCKER": "1",
+      "MCP_LAB_CODEX_TEST": "0",
+      "RUFF_NO_CACHE": "true",
+      "PYTEST_ADDOPTS": "-p no:cacheprovider --junitxml=docs/Cross-check/evidence/full_checks_2026-10-23.xml"
+    },
+    "dependency_paths_used": [
+      "C:/Program Files/PostgreSQL/18/bin",
+      "C:/Program Files/Docker/Docker/resources/bin"
+    ],
+    "docker_server_version_observed": "29.2.1",
+    "tests": {
+      "total": 172,
+      "passed": 171,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "console_elapsed_seconds": 368.27,
+      "junit_elapsed_seconds": 367.05,
+      "junit_timestamp": "2026-10-23T13:08:33.114457+05:30",
+      "skip_details": [
+        {
+          "class": "tests.orchestration.test_postgres",
+          "name": "test_bounded_live_codex_planner_with_native_postgres_and_real_mcp",
+          "reason": "Explicit opt-in required for subscription-consuming Codex smoke."
+        }
+      ]
+    },
+    "package_versions": {
+      "mcp": "2.3.0",
+      "pydantic": "2.13.5",
+      "SQLAlchemy": "2.1.4",
+      "psycopg": "3.3.6",
+      "starlette": "1.7.0",
+      "uvicorn": "0.54.0",
+      "numpy": "2.5.3",
+      "matplotlib": "3.11.2",
+      "pytest": "9.1.1",
+      "ruff": "0.16.10"
+    },
+    "scope": {
+      "live_provider_work_enabled": false,
+      "worker_model_replies": "Deterministic fixtures",
+      "user_database_initialized": false,
+      "production_code_changed_for_audit": false
+    }
+  },
+  "additional_probes": {
+    "script": "evidence/probes.py",
+    "results": "evidence/probes.json",
+    "real_model_requests": 0,
+    "database": "Explicit in-memory SQLite test seam"
+  },
+  "audit_script_ruff": "Lint and format passed for probes.py and build_evidence.py",
+  "workspace": {
+    "env_file_exists": false,
+    "database_url_present": false,
+    "database_url_placeholder": false,
+    "codex_executable_present": true
+  },
+  "final_managed_process_state": {
+    "checked_at_utc": "2026-10-23T08:08:03.9774375Z",
+    "saved_state": "STOPPED",
+    "saved_services": 7,
+    "owned_running": 0,
+    "method": "Test-LabOwnedProcess: project executable, exact creation time, module/instance when CIM is available"
+  },
+  "evidence_sha256": {
+    "build_evidence.py": "ffe75cdcaf669740b47b767b6e48992635f4a8e186e1a533c83efcc8d372c3d3",
+    "full_checks_2026-10-23.xml": "f604cda1269f1f5df1f8719011ff9b51126afb3555deb6431fa28bae3e876b32",
+    "probes.json": "15b0fd56d216a9163c0ec0779b4722a08ffdf132ad5560def749496a40a0e5a7",
+    "probes.py": "64f183291ca6af0fc4d8a4b5228f8db9a2e099af1b8b4624f23229b30ced12a0",
+    "process_state.json": "987d8533363c61b305cdcaf6e054757b2d2081b61f777c8d96e43c1cad037836",
+    "source_manifest.json": "11948a9f512ab3722fa7e9d41707ef3b5476de9503ae0baf16fb8f61a3e16ee2"
+  },
+  "report_checks": {
+    "documents": 8,
+    "source_citations": 477,
+    "file_links_checked": 524,
+    "source_files_match_snapshot": true
+  },
+  "report_sha256": {
+    "01_Planner.md": "e9116376e214aa78fc63087f3334ba0a46fb3e66b7a5ab9939044aeabe9a311b",
+    "02_Executor.md": "861eb53ab8e7c690861529f6d59c251f1e933bca57bb0458cf73c11404d06d27",
+    "03_Agents.md": "105c60548ddb9c8c4058a8127d9d25d6a234ece3fbe358cf8237f106e4353c0b",
+    "04_Evaluation.md": "26ae191f26ff1be28156ae02627bb08207ecdda14ad1c9a3a0c13cd3b5f85d97",
+    "05_Storage_And_Model_Route.md": "880ccd8cd3fcff7745e8e0b05937bf4c9d78209da4cc07a9dc1e6a03958eedbc",
+    "06_Entry_Points_And_Legacy.md": "99c5caf0cf91163c8d9d7602b0008d344d1dfbb802bc396b2d5ca818356a873f",
+    "07_Findings_And_Verification.md": "7b0a0b770e2d56613efe5afcd13875223f56dfb5e9f385e0d54335256bbaeaa3",
+    "README.md": "3aba2c8d7c2c588d7891b203ed14048e79648cd9adf136e6ff9ad45b207da40c"
+  }
+}

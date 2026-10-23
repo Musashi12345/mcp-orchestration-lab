@@ -1,0 +1,110 @@
+{
+  "version": "development-1",
+  "purpose": "Synthetic development data; not held-out research evidence.",
+  "files": {
+    "orders.csv": {
+      "sha256": "72fd544aa718a28e8d6fc07ae41975e0cde3b2558a890ced9360a67ee092e48a",
+      "rows": 24,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "customers.csv": {
+      "sha256": "fa0588961ada03a8b20c0dcb54f5abb68e6bc089bf0a9f2d02957375cdc4bc7d",
+      "rows": 8,
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "segment"
+      ]
+    },
+    "products.csv": {
+      "sha256": "a1905b180023be3f2666246762bce8c35258423fec8b470fb4b628fd71f20aab",
+      "rows": 4,
+      "columns": [
+        "product_id",
+        "product_name",
+        "category"
+      ]
+    },
+    "returns.csv": {
+      "sha256": "32010e068e6ac0e6273cb253ad5da95a00ae5c1019c9f2e1e4e7895d5cfb6d61",
+      "rows": 5,
+      "columns": [
+        "return_id",
+        "order_id",
+        "status",
+        "refund_inr"
+      ]
+    },
+    "payments.csv": {
+      "sha256": "a1deaeb1757a94c7568d1f3da4584b0472e4038baf130fa821c81278cc0e9b87",
+      "rows": 6,
+      "columns": [
+        "payment_id",
+        "order_id",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "monthly_targets.csv": {
+      "sha256": "0e1f06950d0f1f9312bd0e2112211cc83314036faf4b8f30a711302406ff7477",
+      "rows": 6,
+      "columns": [
+        "month",
+        "region",
+        "target_inr"
+      ]
+    },
+    "daily_sales.csv": {
+      "sha256": "d0d1d71947c63057cc0ddd76da819240835309f0735b620af0da8ae0226a3fa6",
+      "rows": 40,
+      "columns": [
+        "date",
+        "units_sold"
+      ]
+    },
+    "stock.csv": {
+      "sha256": "764aab4c122a760227bc31b2fd3bdeac38a518d618c97dff39608f79bf3fb531",
+      "rows": 6,
+      "columns": [
+        "product_id",
+        "warehouse",
+        "available_units"
+      ]
+    },
+    "orders_messy.csv": {
+      "sha256": "4cc951cd5538e1bcc03cc74b6add42b7dd3479ae1ea8396c7fb4135e93c31a2d",
+      "rows": 10,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "orders_with_notes.csv": {
+      "sha256": "2b00a9b99d526267b7cf858c09cbb53aea2d135058209a3022735b6e32fea102",
+      "rows": 8,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr",
+        "notes"
+      ]
+    }
+  }
+}

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-execution-lab"
+version = "0.1.0"
+description = "A CSV data-analysis research harness with MCP agents and DAG orchestration"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "mcp>=2,<3",
+  "pydantic>=2,<3",
+  "sqlalchemy>=2,<3",
+  "pyyaml>=6,<7",
+  "matplotlib>=3.10,<4",
+  "psycopg[binary]>=3.2,<4",
+  "jsonschema>=4.23,<5",
+  "python-dotenv>=1,<2",
+  "numpy>=2,<3",
+  "uvicorn>=0.54,<1",
+  "starlette>=1.7,<2",
+]
+
+[project.scripts]
+mcp-lab = "mcp_execution_lab.cli:main"
+mcp-analysis = "mcp_execution_lab.orchestration.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=1", "ruff>=0.12"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_execution_lab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

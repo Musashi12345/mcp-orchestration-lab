@@ -1,0 +1,7 @@
+{
+  "checked_at_utc": "2026-10-23T08:08:03.9774375Z",
+  "saved_state": "STOPPED",
+  "saved_services": 7,
+  "owned_running": 0,
+  "method": "Test-LabOwnedProcess: project executable, exact creation time, module/instance when CIM is available"
+}

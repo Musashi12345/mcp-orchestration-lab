@@ -1,0 +1,50 @@
+# Owned MCP child processes for CLI runs; no preferred agent order.
+servers:
+- id: data_understanding
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.understanding.server
+- id: data_cleaning
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.cleaning.server
+- id: data_combining
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.combining.server
+- id: data_analysis
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.analysis.server
+- id: prediction
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.prediction.server
+- id: report
+  command: '{python}'
+  args:
+  - -m
+  - mcp_execution_lab.agents.report.server
+model:
+  provider: codex
+  model_id: gpt-6.1-sol
+  reasoning_effort: low
+  timeout_seconds: 90
+limits:
+  concurrency: 2
+  max_model_calls: 32
+  worker_model_calls: 3
+  max_observed_tokens: 120000
+  run_seconds: 1800
+  tool_seconds: 300
+task_rules:
+  reviews:
+  - id: first_review
+    after_completed_steps: 1
+  - id: second_review
+    after_completed_steps: 2

@@ -1,0 +1,52 @@
+{
+  "audit_date": "2026-10-23",
+  "purpose": "Code audit, deterministic probes only",
+  "source_sha256": "a5f846f0795a441ef71a040f14e4292a17e64ae462fe8a7bb009fcd2cf0d0812",
+  "lock_sha256": "370815fd093cab98c60f63b3f529b2c0a27b339105c9795743217ec6ce14ef53",
+  "workspace": {
+    "env_file_exists": false,
+    "database_url_present": false,
+    "database_url_placeholder": false,
+    "codex_executable_present": true
+  },
+  "three_file_join": {
+    "input_files": 3,
+    "columns": [
+      "id",
+      "amount",
+      "segment",
+      "category"
+    ],
+    "rows": [
+      {
+        "id": "001",
+        "amount": "10",
+        "segment": "Personal",
+        "category": "Home"
+      }
+    ],
+    "join_checks": 2
+  },
+  "numeric_text_check": {
+    "bare_digits_rejected": true,
+    "number_in_words_accepted": "Total: twenty dollars.",
+    "fact_marker": "Total: 10."
+  },
+  "oversize_prompt_accounting": {
+    "code": "PROMPT_SIZE",
+    "budget_model_calls": 1,
+    "saved_model_call_records": 0,
+    "provider_requests": 0
+  },
+  "manual_grade_extra_input": {
+    "required_input_files": [
+      "orders.csv"
+    ],
+    "registered_input_files": [
+      "orders.csv",
+      "customers.csv"
+    ],
+    "task_success": true,
+    "execution_kind": "audit_constructed, not model-generated"
+  }
+}

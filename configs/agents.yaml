@@ -1,0 +1,38 @@
+# Managed loopback services started by start_agents.ps1. This list is not an execution order.
+servers:
+  - id: data_understanding
+    transport: streamable-http
+    url: http://127.0.0.1:8767/mcp
+  - id: data_cleaning
+    transport: streamable-http
+    url: http://127.0.0.1:8768/mcp
+  - id: data_combining
+    transport: streamable-http
+    url: http://127.0.0.1:8769/mcp
+  - id: data_analysis
+    transport: streamable-http
+    url: http://127.0.0.1:8770/mcp
+  - id: prediction
+    transport: streamable-http
+    url: http://127.0.0.1:8771/mcp
+  - id: report
+    transport: streamable-http
+    url: http://127.0.0.1:8772/mcp
+model:
+  provider: codex
+  model_id: gpt-6.1-sol
+  reasoning_effort: low
+  timeout_seconds: 90
+limits:
+  concurrency: 2
+  max_model_calls: 32
+  worker_model_calls: 3
+  max_observed_tokens: 120000
+  run_seconds: 1800
+  tool_seconds: 300
+task_rules:
+  reviews:
+    - id: first_review
+      after_completed_steps: 1
+    - id: second_review
+      after_completed_steps: 2

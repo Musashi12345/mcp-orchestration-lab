@@ -1,0 +1,28 @@
+# The MCP server below is a deterministic integration-test fixture, not an AI worker.
+# For the six implemented agents, use agents.yaml or agents_stdio.yaml instead.
+# Tool selection and ordering are entirely determined by the planner.
+servers:
+  - id: fixture
+    command: "{python}"
+    args: [tests/mcp_analysis_server.py]
+    env_names: [MCP_LAB_DATA_ROOT]
+model:
+  provider: codex
+  model_id: gpt-6.1-sol
+  reasoning_effort: low
+  timeout_seconds: 90
+limits:
+  max_model_calls: 8
+  max_observed_tokens: 60000
+  concurrency: 2
+  run_seconds: 600
+task_rules:
+  # Example task settings, identical for matched D1/D2 runs. These count finished
+  # attempted steps (success or known failure), not particular agents or tool names.
+  # Already running work settles before a review. A short/failed plan can leave a
+  # review unreached; this is recorded, without forcing extra tool calls.
+  reviews:
+    - id: first_review
+      after_completed_steps: 1
+    - id: second_review
+      after_completed_steps: 2

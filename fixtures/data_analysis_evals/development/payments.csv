@@ -1,0 +1,7 @@
+payment_id,order_id,status,amount_inr
+PAY1,0002,captured,50.25
+PAY2,0003,captured,75.5
+PAY3,0003,pending,75.5
+PAY4,0004,captured,40
+PAY5,0004,captured,60.75
+PAY6,0099,failed,0

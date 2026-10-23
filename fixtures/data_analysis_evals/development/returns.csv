@@ -1,0 +1,6 @@
+return_id,order_id,status,refund_inr
+R1,0002,approved,25
+R2,0003,approved,50.5
+R3,0003,rejected,10
+R4,0099,approved,12
+R5,,approved,7.25

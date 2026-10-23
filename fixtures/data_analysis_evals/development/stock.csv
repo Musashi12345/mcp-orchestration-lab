@@ -1,0 +1,7 @@
+product_id,warehouse,available_units
+P1,A,0
+P1,B,4
+P2,A,5
+P2,B,18
+P3,A,3
+P4,B,9
