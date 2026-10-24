@@ -19,11 +19,20 @@ class ModelConfig(Record):
     timeout_seconds: float = Field(default=90, gt=0)
 
 
+class ProgramRunnerConfig(Record):
+    image: str = "mcp-execution-lab-csv-p1:dev"
+    cpus: float = Field(default=1, gt=0)
+    memory_mib: int = Field(default=512, gt=0)
+    pids: int = Field(default=64, ge=8)
+    tmp_mib: int = Field(default=16, gt=0)
+
+
 class Settings(Record):
     servers: list[ServerConfig] = Field(min_length=1)
     model: ModelConfig = Field(default_factory=ModelConfig)
     limits: Limits = Field(default_factory=Limits)
     task_rules: TaskRules = Field(default_factory=TaskRules)
+    program_runner: ProgramRunnerConfig = Field(default_factory=ProgramRunnerConfig)
 
 
 def load_settings(path: Path) -> Settings:

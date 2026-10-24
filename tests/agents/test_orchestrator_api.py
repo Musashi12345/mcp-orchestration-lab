@@ -50,7 +50,10 @@ async def call(app, path, method="GET", body=None, token="test-admin"):
 @pytest.mark.skipif(
     os.environ.get("MCP_LAB_POSTGRES_TEST") != "1", reason="Native PostgreSQL opt-in required."
 )
-async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["D1", "P1"])
+async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, monkeypatch, mode):
+    if mode == "P1" and os.environ.get("MCP_LAB_DOCKER_TEST") != "1":
+        pytest.skip("Real Docker opt-in required for P1.")
     cluster = await asyncio.to_thread(LocalPostgres(tmp_path / "postgres").start)
     store = Store(cluster.url)
     monkeypatch.setenv("MCP_LAB_DATABASE_URL", cluster.url)
@@ -78,11 +81,17 @@ async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, 
             app,
             "/runs",
             "POST",
-            {"query": "Explain this file", "csv_paths": ["sample.csv"], "plan_only": True},
+            {
+                "query": "Explain this file",
+                "csv_paths": ["sample.csv"],
+                "plan_only": True,
+                "mode": mode,
+            },
         )
         assert status == 200 and planned["status"] == "READY_FOR_EXECUTION"
         run_id = planned["run_id"]
         assert len(model.requests) == 4
+        assert model.requests[-1]["stage"] == ("program" if mode == "P1" else "dag")
         status, result = await call(app, f"/runs/{run_id}/execute", "POST")
         assert status == 200 and result["status"] == "COMPLETED"
         assert len(model.requests) == 6

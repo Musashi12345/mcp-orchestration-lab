@@ -1,18 +1,23 @@
-# Current state after the CSV-only cleanup
+# Current CSV implementation
 
 Updated: 2026-10-23. The application now has one active domain: CSV data analysis.
+
+P1 now generates Python directly and executes it only in a separate CSV Docker image.
+It shares the tool broker, worker gateway, budget, and run evidence with D1/D2. P2 remains
+unimplemented. See [the P1 source walkthrough](../Planner%20and%20Executor/P1.md).
 
 ## Active modules
 
 | Component | Current source |
 |---|---|
 | CLI | `src/mcp_execution_lab/cli.py`: `analysis`, `eval`, `models` only. |
-| Planner | `orchestration/planner.py`, `graph.py`, `models.py`: discover tools, understand task, select/refine jobs, validate DAG. |
-| Executor | `orchestration/executor.py`, `bindings.py`, `broker.py`, `mcp.py`: readiness, parallelism, checked MCP calls, D2 reviews. |
+| Planner | `orchestration/planner.py`, `graph.py`, `programs.py`, `models.py`: shared task/tool stages, then checked DAG or direct Python. |
+| Executor | `orchestration/runtime.py`, `executor.py`, `program_executor.py`, `broker.py`, `mcp.py`: shared checked calls and records; DAG scheduling or P1 pipe requests. |
+| Python boundary | `orchestration/program_container.py`, `program_sdk/`, `containers/csv_python/Dockerfile`: pinned image, approved limits, framed messages, source checks, cleanup. |
 | Model bridge | `orchestration/model_clients.py`, `model.py`, `budget.py`: Codex/command routes, request records, shared allowance. |
 | Storage | `orchestration/storage.py`, `files.py`: PostgreSQL records and disk files linked to each run. |
 | Agents | `agents/understanding`, `cleaning`, `combining`, `analysis`, `prediction`, `report` and `agents/common`. |
-| Evaluation | `evaluation/`: frozen CSV suites, independent checks, human review, paired D1/D2 batches. |
+| Evaluation | `evaluation/`: frozen CSV suites, independent checks, human review, matched D1/D2/P1 batches. |
 | Services | `orchestration/server.py`, `start_agents.ps1`, `stop_agents.ps1`. |
 
 Paths below `orchestration`, `agents`, and `evaluation` are inside `src/mcp_execution_lab`.
@@ -31,10 +36,20 @@ The useful provider bridge was moved into the CSV orchestration package. It now 
 current errors and requires a supplied response schema, with no pricing fallback types.
 The live CSV smoke reads agent settings instead of the removed pricing config.
 
-P1/P2 remain **unimplemented for CSVs**. The cleanup does not replace them with another
-generated-code runner. It does not fix unrelated findings in the previous audit.
+The removal did not bring back the older pricing runner. P1 was subsequently implemented
+with a new CSV-only runner. P2 and unrelated documented audit findings remain open.
 
-## Fresh checks
+## Validation
+
+P1 verification uses fixed model replies and real Docker, official-SDK MCP processes,
+and isolated native PostgreSQL. See [P1 validation evidence](../../reports/p1_validation_2026-10-23/README.md)
+for the final counts, hashes, sandbox evidence, and evidence-preservation result.
+
+The final P1 suite passed Ruff/formatting for 107 Python files and **180 tests passed,
+1 live-model test skipped in 547.46 seconds**. All 8,902 prior evidence files were unchanged.
+No P1 containers, owned managed services, or test PostgreSQL processes remained.
+
+The following counts describe the earlier cleanup source:
 
 `scripts/check.ps1` passed Ruff and formatting for 95 Python files, then **131 tests passed,
 1 skipped in 288.31 seconds**. Real MCP and temporary native PostgreSQL checks were enabled.

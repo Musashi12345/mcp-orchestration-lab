@@ -1,0 +1,8 @@
+**
+!containers/
+!containers/csv_python/
+!containers/csv_python/Dockerfile
+!src/
+!src/mcp_execution_lab/
+!src/mcp_execution_lab/program_sdk/
+!src/mcp_execution_lab/program_sdk/*.py

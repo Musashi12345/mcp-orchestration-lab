@@ -9,6 +9,7 @@ from .model import ModelCalls
 from .model_clients import make_planner
 from .models import Handoff, OrchestrationError, fingerprint
 from .planner import Planner
+from .program_executor import ProgramExecutor
 
 
 class Application:
@@ -55,5 +56,15 @@ class Application:
         handoff = Handoff.model_validate(saved[-1]["payload"]["handoff"])
         budget, files, model = self.components()
         budget.restore(saved[-1]["payload"]["usage"])
-        runner = Executor(self.store, files, budget, self.settings.servers, model)
+        if handoff.mode == "P1":
+            runner = ProgramExecutor(
+                self.store,
+                files,
+                budget,
+                self.settings.servers,
+                model,
+                runner_config=self.settings.program_runner,
+            )
+        else:
+            runner = Executor(self.store, files, budget, self.settings.servers, model)
         return await runner.run(handoff)

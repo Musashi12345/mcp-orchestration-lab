@@ -70,6 +70,12 @@ class Files:
     async def put_bytes(self, run_id, data: bytes, kind: str, *, parents=()):
         if kind not in {"png", "svg", "md", "csv", "json"}:
             raise OrchestrationError("FILE_KIND", "Unsupported output file kind.")
+        return await self._put_bytes(run_id, data, kind, parents=parents)
+
+    async def put_program(self, run_id, source: str, *, parents=()):
+        return await self._put_bytes(run_id, source.encode("utf-8"), "py", parents=parents)
+
+    async def _put_bytes(self, run_id, data, kind, *, parents=()):
         if len(data) > self.limits.max_file_bytes:
             raise OrchestrationError("RESULT_SIZE", "Output exceeded its file allowance.")
         if kind == "csv":

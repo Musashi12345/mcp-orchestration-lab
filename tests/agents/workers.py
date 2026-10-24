@@ -95,6 +95,17 @@ class AgentModel:
                     }
                 ],
             }
+        elif stage == "program":
+            refs = ", ".join(
+                f'inputs["datasets"][{item["ref"]["id"]!r}]' for item in context["datasets"]
+            )
+            value = {
+                "source": f"""async def run(sdk, inputs):
+    result = await sdk.call("work", {{"job": {job!r}, "datasets": [{refs}]}})
+    return {{"answer": result["value"]}}
+""",
+                "outputs": ["answer"],
+            }
         elif stage == "dag":
             refs = [{"kind": "dataset", "key": item["ref"]["id"]} for item in context["datasets"]]
             args = {

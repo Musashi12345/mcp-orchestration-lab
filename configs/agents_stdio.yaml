@@ -48,3 +48,9 @@ task_rules:
     after_completed_steps: 1
   - id: second_review
     after_completed_steps: 2
+program_runner:
+  image: mcp-execution-lab-csv-p1:dev
+  cpus: 1
+  memory_mib: 512
+  pids: 64
+  tmp_mib: 16

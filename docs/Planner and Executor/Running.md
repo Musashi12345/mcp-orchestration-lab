@@ -10,7 +10,7 @@ The planner discovers configured MCP tools and saves their exact definitions. It
 
 The executor starts ready work within the concurrency limit, calls the exact server/tool named by each step, and saves outcomes before starting dependent work. It supports conditions, explicit alternatives, recorded failures, bounded retries, confirmed-result reuse, and D2 revisions with references to completed outputs.
 
-The six LLM data-analysis workers are implemented. See [the agent guide](../Agents/Running.md) for their methods, limits, API, and one-command start/stop scripts. The example MCP server remains a deterministic test fixture. CSV runs support D1/D2 only. The older pricing code and Python runner have been removed; previous run evidence is retained.
+The six LLM data-analysis workers are implemented. See [the agent guide](../Agents/Running.md) for their methods, limits, API, and one-command start/stop scripts. The example MCP server remains a deterministic test fixture. CSV runs support D1/D2/P1. [P1](P1.md) uses a new CSV-only Docker image and the same tool gate. P2 remains unimplemented. The older pricing code and its Python runner have been removed; previous run evidence is retained.
 
 ## Local PostgreSQL and files
 
@@ -108,7 +108,7 @@ For a planned backup after a known failure, use `dependency_policy: settled`, a 
 
 - Execution completion means the plan's required work finished. That execution record keeps `task_success` unknown and `evaluation_status` as `NOT_EVALUATED`. The separate [evaluation mechanism](../evaluation/Running.md) grades the exact published development tasks and saves run-linked evaluation records.
 - Worker outputs use structured JSON with registered file references. A non-completed worker outcome fails that step; receiving an MCP reply alone does not mean the job succeeded.
-- The executor cannot run worker-generated analysis code. The old container runner has been removed. Future generated-code execution requires an isolated design; never run it in the host process.
+- Worker-generated analysis code is not supported. P1 runs only its limited main orchestration program in the new Docker image; data calculations stay in the agents. Generated code never runs in the host process. The old pricing runner remains removed.
 - The connection manager uses the official SDK for stdio and local streamable HTTP. Remote hosting is outside this version.
 - Worker AI calls share the run's live allowance and are saved with their worker/attempt links. The worker support service only grants access to supplied files and checked output publication.
 - Automatic restart of running or uncertain actions is not implemented. A confirmed saved result can be reused within the run; an unknown outcome is not silently replayed.
@@ -134,4 +134,14 @@ $env:MCP_LAB_POSTGRES_TEST = '1'
 
 This starts and stops a separate temporary, password-protected PostgreSQL cluster on a free local port. It does not need or alter the existing PostgreSQL service's login. Windows restricted shells may prevent `initdb` from starting; use a normal user terminal for this integration check.
 
-Docker and its old integration checks have been removed. A live Codex smoke is separately opt-in with `MCP_LAB_CODEX_TEST=1` together with `MCP_LAB_POSTGRES_TEST=1`; it uses the model in `configs/agents_stdio.yaml`, consumes subscription allowance, and caps planning at eight calls. Live smoke attempts keep their files under `runs/data_analysis_smoke/` and audit exports under `reports/orchestration_validation/`, including failed attempts.
+The old pricing runner and its checks were removed. The new CSV P1 image is separate.
+Build it with `analysis runner-build --config configs/agents_stdio.yaml` and set
+`MCP_LAB_DOCKER_TEST=1` to include real P1 container tests. Native PostgreSQL tests can
+be enabled at the same time. Fixed model replies are used unless live testing is explicitly
+enabled.
+
+A live Codex smoke is separately opt-in with `MCP_LAB_CODEX_TEST=1` together with
+`MCP_LAB_POSTGRES_TEST=1`; it uses the model in `configs/agents_stdio.yaml`, consumes
+subscription allowance, and caps planning at eight calls. Live smoke attempts keep their
+files under `runs/data_analysis_smoke/` and audit exports under `reports/orchestration_validation/`,
+including failed attempts.

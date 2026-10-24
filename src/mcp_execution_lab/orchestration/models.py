@@ -128,6 +128,12 @@ class ToolCache(Record):
                 return tool
         raise OrchestrationError("UNKNOWN_TOOL", f"Unknown discovered tool: {server}/{name}")
 
+    def by_key(self, key: str) -> ToolDefinition:
+        for tool in self.tools:
+            if tool.key == key:
+                return tool
+        raise OrchestrationError("UNKNOWN_TOOL", f"Unknown discovered tool: {key}")
+
 
 class FileRef(Record):
     id: str
@@ -222,11 +228,16 @@ Binding.model_rebuild()
 Condition.model_rebuild()
 
 
-class Step(Record):
+class CallSpec(Record):
+    """Tool/job identity shared by DAG nodes and program-issued calls."""
+
     id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
     subtask_id: str
     server: str
     tool: str
+
+
+class Step(CallSpec):
     depends_on: list[str] = Field(default_factory=list)
     arguments: dict[str, Binding]
     condition: Condition | None = None
@@ -236,6 +247,21 @@ class Step(Record):
 class Plan(Record):
     steps: list[Step] = Field(default_factory=list)
     outputs: dict[str, Binding] = Field(min_length=1)
+
+
+class PythonProgram(Record):
+    """A directly generated orchestration program, not a translated DAG."""
+
+    source: str = Field(min_length=1)
+    outputs: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def distinct_outputs(self):
+        if len(set(self.outputs)) != len(self.outputs) or any(
+            not name.strip() for name in self.outputs
+        ):
+            raise ValueError("Program outputs need distinct, nonempty names.")
+        return self
 
 
 class ReviewDecision(Record):
@@ -256,17 +282,27 @@ class ReviewDecision(Record):
 
 class Handoff(Record):
     run_id: str
-    mode: Literal["D1", "D2"]
+    mode: Literal["D1", "D2", "P1"]
     task: MainTask
     datasets: list[Dataset]
     cache: ToolCache
     cache_record: str
     task_record: str
     breakdown: Breakdown
-    plan: Plan
+    plan: Plan | None = None
+    program: PythonProgram | None = None
     plan_record: str
     version: int = 1
     rules: TaskRules
+
+    @model_validator(mode="after")
+    def representation_matches_mode(self):
+        if self.mode == "P1":
+            if self.program is None or self.plan is not None:
+                raise ValueError("P1 requires a Python program and no DAG.")
+        elif self.plan is None or self.program is not None:
+            raise ValueError("D1/D2 require a DAG and no Python program.")
+        return self
 
 
 class StructuredPayload(Record):

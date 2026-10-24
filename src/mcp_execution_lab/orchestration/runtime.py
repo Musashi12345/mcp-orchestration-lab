@@ -116,6 +116,7 @@ class Runtime:
             except asyncio.CancelledError:
                 await self._state(name, "CANCELLED")
             except BaseException as exc:
+                await self._state(name, "FAILED", {"error": str(exc)[:2000]})
                 fatal = exc
             else:
                 await self._state(name, "SUCCEEDED", {"output": ref.model_dump()})

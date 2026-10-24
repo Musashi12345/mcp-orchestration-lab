@@ -11,9 +11,11 @@ from .models import (
     MainTask,
     OrchestrationError,
     Plan,
+    PythonProgram,
     Selection,
     fingerprint,
 )
+from .programs import PROGRAM_INSTRUCTIONS, validate_program
 from .provenance import source_identity
 
 
@@ -38,7 +40,9 @@ class Planner:
             )
             raise
 
-    async def _generate(self, run_id, stage, result_type, context, validate=None):
+    async def _generate(
+        self, run_id, stage, result_type, context, validate=None, *, instructions=None
+    ):
         async def produce(stage_id):
             errors = []
             previous = None
@@ -50,6 +54,7 @@ class Planner:
                         result_type,
                         context | {"validation_errors": errors, "previous_candidate": previous},
                         parent=stage_id,
+                        instructions=instructions,
                     )
                     previous = result.model_dump(mode="json")
                     await self.store.put(
@@ -97,8 +102,8 @@ class Planner:
     ):
         from .models import TaskRules
 
-        if mode not in {"D1", "D2"}:
-            raise OrchestrationError("MODE", "The new DAG path accepts D1 and D2.")
+        if mode not in {"D1", "D2", "P1"}:
+            raise OrchestrationError("MODE", "Supported modes are D1, D2, and P1.")
         rules = rules or TaskRules()
         if mode == "D2" and len(rules.reviews) != 2:
             raise OrchestrationError("TASK_RULES", "D2 requires two task-defined review points.")
@@ -253,21 +258,40 @@ class Planner:
             breakdown.model_dump(),
             parents=[("task", task_id), ("cache", cache_id), ("draft_selection", selection_id)],
         )
-        plan = await self._generate(
-            run_id,
-            "dag",
-            Plan,
-            common | {"breakdown": breakdown.model_dump()},
-            lambda value: validate_plan(value, breakdown, cache, datasets, self.budget.limits),
-        )
+        plan, program = None, None
+        context = common | {"breakdown": breakdown.model_dump()}
+        if mode == "P1":
+            program = await self._generate(
+                run_id,
+                "program",
+                PythonProgram,
+                context,
+                lambda value: validate_program(value, breakdown, cache, self.budget.limits),
+                instructions=PROGRAM_INSTRUCTIONS,
+            )
+            source = await self.files.put_program(
+                run_id, program.source, parents=[("breakdown", breakdown_id)]
+            )
+            payload = {
+                "version": 1,
+                "program": program.model_dump(),
+                "valid": True,
+                "source": source.model_dump(),
+                "language_policy": validate_program(program, breakdown, cache, self.budget.limits),
+            }
+        else:
+            plan = await self._generate(
+                run_id,
+                "dag",
+                Plan,
+                context,
+                lambda value: validate_plan(value, breakdown, cache, datasets, self.budget.limits),
+            )
+            payload = {"version": 1, "plan": plan.model_dump(), "valid": True}
         plan_id = await self.store.put(
             run_id,
-            "plan",
-            {
-                "version": 1,
-                "plan": plan.model_dump(),
-                "valid": True,
-            },
+            "program" if mode == "P1" else "plan",
+            payload,
             parents=[("breakdown", breakdown_id), ("cache", cache_id), ("task", task_id)],
         )
         handoff = Handoff(
@@ -280,6 +304,7 @@ class Planner:
             task_record=task_id,
             breakdown=breakdown,
             plan=plan,
+            program=program,
             plan_record=plan_id,
             rules=rules,
         )

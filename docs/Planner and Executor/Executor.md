@@ -2,7 +2,7 @@
 
 Date: 2026-10-15
 
-Implementation update, 2026-10-23: the D1/D2 engine and six agents are implemented. CSV P1/P2 remain future work. The older pricing implementation and container runner have been removed. See [Running.md](Running.md).
+Implementation update, 2026-10-23: the D1/D2 engine, six agents, and CSV P1 are implemented. P1 uses a separate Docker image with the same broker and runtime records. P2 remains future work. The older pricing implementation and its container runner have been removed. See [Running.md](Running.md) and [P1.md](P1.md).
 
 Related document: [Planner.md](Planner.md).
 

@@ -115,9 +115,12 @@ failures, uncertain work, and evaluation errors remain visible. Source/lock chan
 new work. There is no automatic resume or cross-run model-response cache. If a process
 is killed, inspect the retained records; incomplete runs are not silently replayed.
 
-The new data-analysis execution path currently supports D1/D2. P1/P2 execution for these
-agents must be connected to the same runtime before the four-way comparison is valid.
-No Python score is manufactured from a DAG run.
+The CSV execution path supports D1/D2/P1 through the same tool runtime. To include P1,
+build the CSV image first with `analysis runner-build --config configs/agents_stdio.yaml`
+and pass `--modes D1 D2 P1` explicitly. P1 runs its saved Python program in Docker;
+the same independent checks grade its declared outputs. P2 remains unimplemented, so
+a complete four-mode comparison is not yet available. No Python score is manufactured
+from a DAG run. Fixed-reply integration batches are exploratory software checks.
 
 ## Review and reports
 

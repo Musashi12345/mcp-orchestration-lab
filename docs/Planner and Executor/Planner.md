@@ -2,7 +2,7 @@
 
 Date: 2026-10-09
 
-Implementation update, 2026-10-23: the D1/D2 planner and six agents are implemented. CSV P1/P2 remain future work. The older pricing implementation has been removed. See [Running.md](Running.md). The design below distinguishes implemented DAG planning from the planned Python treatments.
+Implementation update, 2026-10-23: the D1/D2 planner, direct P1 Python generation, and six agents are implemented. P2 remains future work. The older pricing implementation has been removed. See [Running.md](Running.md) and [the P1 contract](P1.md). The design below includes future P2 work as well as implemented behavior.
 
 ## 1. Purpose
 
@@ -292,7 +292,8 @@ The old pricing source, fixtures, and tests were removed on 2026-10-23. Existing
 - [x] Add structural validation, saved errors, and limited LLM correction.
 - [x] Add the saved planner handoff without automatically running the executor.
 - [x] Count planning calls and preserve source/configuration identities and previous run evidence.
-- [ ] Extend the new data-analysis path to P1/P2 using the same worker and runtime rules.
+- [x] Extend the CSV path to P1 using the same worker and runtime rules.
+- [ ] Add P2 using those same rules.
 - [x] Verify deterministic planning with genuine MCP discovery before the bounded real Codex smoke.
 
 Important verification cases:

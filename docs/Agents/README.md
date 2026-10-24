@@ -287,5 +287,6 @@ runs. Live model smokes come only after these checks and use an explicit bounded
 - [ ] Complete a bounded live-model smoke and retain both successful and failed attempts.
 - [x] Update running instructions and remaining limits based on what actually passed.
 
-CSV P1/P2 execution, remote MCP hosting, and a new dashboard remain separate work.
+CSV P1 now calls these agents through the same broker from its new Docker runner; see
+[P1](../Planner%20and%20Executor/P1.md). P2, remote MCP hosting, and a new dashboard remain separate work.
 An independent development grader is now implemented; see [evaluation](../evaluation/Running.md).

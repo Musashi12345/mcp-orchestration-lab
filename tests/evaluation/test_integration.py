@@ -36,6 +36,26 @@ class EvalModel(AgentModel):
         assert not any(
             key in text for key in ("expected_rows", "grader_sha256", "evaluation_result")
         )
+        if request["stage"] == "program":
+            self.requests.append(request)
+            dataset = request["context"]["datasets"][0]["ref"]["id"]
+            value = {
+                "source": f'''async def run(sdk, inputs):
+    result = await sdk.call("work", {{
+        "job": "Complete the assigned data task",
+        "datasets": [inputs["datasets"]["{dataset}"]]}})
+    return {{"answer": result["value"]}}
+''',
+                "outputs": ["answer"],
+            }
+            return {
+                "content": {"content_json": json.dumps(value)},
+                "usage": {"input_tokens": 10, "output_tokens": 10},
+            }
+        if request["role"] == "worker":
+            run_id = directory.parent.parent.name
+            attempts = await self.store.list_records(run_id, "tool_attempt")
+            assert attempts[-1]["payload"]["status"] == "RUNNING"
         return await super().generate(request, directory)
 
 
@@ -59,7 +79,7 @@ def settings():
     )
 
 
-async def paired_check(store, tmp_path):
+async def paired_check(store, tmp_path, modes=("D1", "D2")):
     await store.initialize()
     client = EvalModel(store)
     result = await run_batch(
@@ -69,18 +89,21 @@ async def paired_check(store, tmp_path):
         Suite(SUITE),
         tmp_path / "reports",
         task_ids=["sales_total"],
-        modes=["D1", "D2"],
+        modes=modes,
         repeats=1,
         seed=7,
-        max_model_calls=16,
+        max_model_calls=8 * len(modes),
         client=client,
     )
     manifest = result["manifest"]
     assert manifest["status"] == "COMPLETED"
-    assert len({e["run_id"] for e in manifest["episodes"]}) == 2
+    assert len({e["run_id"] for e in manifest["episodes"]}) == len(modes)
     summary = await report_batch(store, result["directory"])
     assert summary["modes"]["D1"]["passed"] == summary["modes"]["D2"]["passed"] == 1
     assert summary["comparisons"]["D1_to_D2"]["scored_pairs"] == 1
+    if "P1" in modes:
+        assert summary["modes"]["P1"]["passed"] == 1
+        assert summary["comparisons"]["D1_to_P1"]["scored_pairs"] == 1
     assert manifest["used_model_calls"] == len(client.requests)
     audits = []
     for episode in manifest["episodes"]:
@@ -117,6 +140,20 @@ async def test_native_postgres_saves_run_linked_evaluation_and_pair_reports(tmp_
     store = Store(cluster.url)
     try:
         await paired_check(store, tmp_path)
+    finally:
+        await store.close()
+        await asyncio.to_thread(cluster.close)
+
+
+@pytest.mark.skipif(
+    os.environ.get("MCP_LAB_POSTGRES_TEST") != "1" or os.environ.get("MCP_LAB_DOCKER_TEST") != "1",
+    reason="Native PostgreSQL and real Docker opt-ins required.",
+)
+async def test_native_postgres_real_worker_and_docker_p1_share_independent_evaluation(tmp_path):
+    cluster = await asyncio.to_thread(LocalPostgres(tmp_path / "postgres").start)
+    store = Store(cluster.url)
+    try:
+        await paired_check(store, tmp_path, modes=("D1", "D2", "P1"))
     finally:
         await store.close()
         await asyncio.to_thread(cluster.close)

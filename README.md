@@ -1,9 +1,8 @@
-<<<<<<< HEAD
 # MCP Execution Lab
 
 A CSV data-analysis research application. Give it a question and CSV files; its planner
-discovers configured MCP tools, chooses the required jobs, and creates a checked DAG.
-The executor runs ready jobs, including independent jobs in parallel. The main prompt
+discovers configured MCP tools, chooses the required jobs, and creates a checked DAG
+or a limited Python program. The executor supports independent jobs in parallel. The main prompt
 does not prescribe an agent order.
 
 The six agents are Understanding, Cleaning, Combining, Analysis, Prediction, and Report.
@@ -17,14 +16,16 @@ Records use local PostgreSQL; original CSV copies and generated files stay on di
 |---|---|
 | D1 | Model-created DAG; no main-planner review calls during execution. |
 | D2 | Same runtime, with two configured review opportunities for remaining work. |
-| P1/P2 | Not implemented for CSVs. |
+| P1 | Model writes one Python program; Docker runs it through the shared MCP tool gate. No main-planner calls during execution. |
+| P2 | Not implemented. |
 
 D1 can still use model calls for initial planning and inside selected agents. D2 review
 thresholds count finished attempted steps; short graphs may leave a review unreached.
 Execution completion is separate from independent evaluation of the answer.
 
 The superseded pricing experiments, generated-Python container runner, old grader, and
-old dashboard have been removed. Docker is no longer a prerequisite. Earlier run files,
+old dashboard have been removed. The new CSV P1 runner requires Docker with Linux containers;
+D1/D2 do not. Earlier run files,
 databases, batches, and reports are retained as historical evidence. See the
 [cleanup/current-state note](docs/Cross-check/README.md).
 
@@ -65,16 +66,31 @@ For a CLI run with client-owned MCP subprocesses:
 accepted, unstarted run. Submitting a run uses configured model allowance. Keep both
 PostgreSQL and the file root when backing up evidence.
 
+For P1, build the separate runner image first, then use `--mode P1`:
+
+```powershell
+.\scripts\lab.ps1 analysis runner-build --config configs/agents_stdio.yaml
+.\scripts\lab.ps1 analysis run --query "Calculate total amount" --csv fixtures/data_analysis/example.csv --config configs/agents_stdio.yaml --mode P1
+```
+
+The image uses a pinned official Python 3.12 slim base. Generated Python runs as a
+non-root user with no network or host mounts, a read-only image, 1 CPU, 512 MiB memory,
+64 processes, and 16 MiB temporary space. It receives references and checked results
+over pipes. Rebuild after changing `program_sdk`; execution refuses an outdated image.
+See [P1 details](docs/Planner%20and%20Executor/P1.md).
+
 ## Evaluation and checks
 
 The CSV evaluator has ten synthetic CSVs and fifteen public development tasks, independent
-answer checks, run-linked grades, human review, and paired D1/D2 reports.
+answer checks, run-linked grades, human review, and matched D1/D2/P1 reports.
 
 ```powershell
 .\scripts\lab.ps1 eval list
 .\scripts\check.ps1
 # Include separate temporary native PostgreSQL integration tests:
 $env:MCP_LAB_POSTGRES_TEST = '1'
+# Also exercise the prebuilt P1 image with real Docker:
+$env:MCP_LAB_DOCKER_TEST = '1'
 .\scripts\check.ps1
 ```
 
@@ -82,9 +98,11 @@ Live Codex testing is separately opt-in with `MCP_LAB_CODEX_TEST=1` and consumes
 allowance. Normal tests use fixed model replies with actual MCP processes and calculations.
 These are engineering/development checks, not evidence of a research winner.
 
-Fresh CSV-only validation on 2026-10-23 passed lint/format checks and **131 tests,
+Earlier CSV cleanup validation on 2026-10-23 passed lint/format checks and **131 tests,
 with 1 live-model test skipped**, including native PostgreSQL and real MCP checks.
 See [the saved results](reports/csv_cleanup_2026-10-23/README.md).
+The subsequent P1 validation passed **180 tests with 1 live-model skip**, including real
+Docker, MCP, native PostgreSQL, and service lifecycle checks. See [P1 test evidence](reports/p1_validation_2026-10-23/README.md).
 
 ## Code and guides
 
@@ -101,6 +119,3 @@ See [the saved results](reports/csv_cleanup_2026-10-23/README.md).
 - [Original reference guide](docs/reference/Execution_Engine_Research_App_Build_Guide.md)
 
 No employer source or proprietary data belongs in this independent project.
-=======
-# mcp-orchestration-lab
->>>>>>> origin/main

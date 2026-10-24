@@ -1,4 +1,4 @@
-"""Local PostgreSQL-backed planner and DAG executor commands."""
+"""Local PostgreSQL-backed planning, DAG execution, and CSV Python execution commands."""
 
 import argparse
 import asyncio
@@ -13,6 +13,10 @@ from .storage import Store
 
 
 async def dispatch(args):
+    if args.action == "runner-build":
+        from .program_container import build_image
+
+        return {"status": "READY", **await build_image(load_settings(args.config).program_runner)}
     root = Path.cwd()
     url, data_root = local_environment(root)
     store = Store(url)
@@ -46,8 +50,10 @@ async def dispatch(args):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Data-analysis planning and DAG execution")
+    parser = argparse.ArgumentParser(description="Data-analysis planning and DAG/Python execution")
     actions = parser.add_subparsers(dest="action", required=True)
+    build = actions.add_parser("runner-build", help="Build the pinned CSV-only P1 Docker image")
+    build.add_argument("--config", type=Path, required=True)
     actions.add_parser("db-init", help="Create the project tables in configured local PostgreSQL")
     inspect = actions.add_parser("inspect", help="Read a run's live records")
     inspect.add_argument("--run", required=True)
@@ -61,7 +67,7 @@ def main(argv=None):
         command.add_argument("--query", required=True)
         command.add_argument("--csv", type=Path, action="append", required=True)
         command.add_argument("--config", type=Path, required=True)
-        command.add_argument("--mode", choices=["D1", "D2"], default="D1")
+        command.add_argument("--mode", choices=["D1", "D2", "P1"], default="D1")
         command.add_argument("--encoding", default="utf-8-sig")
         command.add_argument("--delimiter", default=",")
     args = parser.parse_args(argv)

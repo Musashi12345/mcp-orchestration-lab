@@ -1,9 +1,9 @@
 # Current implementation and research limits
 
-The active application is CSV data analysis with D1/D2. P1/P2 are not implemented for
-this domain. The older pricing experiments, Python container runner, evaluator, and
+The active application is CSV data analysis with D1/D2/P1. P2 is not implemented.
+The older pricing experiments, Python container runner, evaluator, and
 dashboard have been removed. Historical databases, runs, batches, and reports remain.
-There is no Docker requirement for running or testing the remaining application.
+P1 uses a new CSV-only Docker runner; D1/D2 do not need Docker. PostgreSQL stays native.
 
 ## Planning and execution
 
@@ -13,8 +13,19 @@ There is no Docker requirement for running or testing the remaining application.
   Parallel draining can reach both at once; short plans can leave a review unreached.
 - Unknown outcomes are saved and stopped, not silently retried. Durable host-crash resume
   and reconciliation of unfinished external work are not implemented.
-- The application cannot execute generated Python, shell, SQL, or arbitrary analysis
-  formulas. Future generated-code execution needs a separate isolation design.
+- P1 permits one limited async Python function for calls, conditions, and parallel work.
+  It forbids imports, loops, helpers, arithmetic, and direct file/network access. Data
+  calculations remain in the agents. These language checks enforce the experiment's
+  scope; Docker is the execution boundary. Shell, SQL, and arbitrary formulas are absent.
+- P1 uses the same broker, worker gateway, budgets, and attempt records as DAG runs.
+  It has one call site per assigned job; conditional jobs can be skipped. A successful
+  fallback explicitly names confirmed failures it handles. Unknown outcomes stop the run.
+- The Docker daemon and local service processes are trusted. The container shares the
+  Docker Linux kernel; this is not a separate VM per program. Host death can leave a
+  container or external operation unfinished. No automatic crash reconciliation is claimed.
+- P1 records its exact image ID and SDK hash. A development image label checks local
+  build freshness; it is not a signed software supply-chain guarantee. Rebuild after SDK
+  changes. Existing saved handoffs from older source/configurations must be replanned.
 - The prompt-size check currently happens after reserving a model-call slot. An oversized
   unsent request can consume a slot without a saved provider-call record. This audit
   finding remains unfixed by the removal-only cleanup.

@@ -53,8 +53,8 @@ async def run_batch(
 ):
     if repeats < 1 or repeats > 100 or max_model_calls < 1:
         raise ValueError("Provide positive repeats and a total model-request ceiling.")
-    if not modes or len(set(modes)) != len(modes) or not set(modes) <= {"D1", "D2"}:
-        raise ValueError("This execution path currently supports distinct D1/D2 modes only.")
+    if not modes or len(set(modes)) != len(modes) or not set(modes) <= {"D1", "D2", "P1"}:
+        raise ValueError("Choose distinct supported modes: D1, D2, P1.")
     if "D2" in modes and len(settings.task_rules.reviews) != 2:
         raise ValueError("D2 evaluation needs two configured task review opportunities.")
     chosen = [suite.task(key) for key in task_ids] if task_ids else suite.tasks

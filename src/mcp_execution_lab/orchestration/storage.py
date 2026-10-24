@@ -275,8 +275,13 @@ class Store:
         return dict(row)
 
     async def register_steps(self, run_id, plan_id, plan):
+        await self.register_calls(run_id, plan_id, plan.steps)
+
+    async def register_calls(self, run_id, plan_id, calls):
+        """Save declared call identities without requiring a graph representation."""
+
         def save(connection):
-            for step in plan.steps:
+            for step in calls:
                 connection.execute(
                     insert(steps).values(
                         run_id=run_id,

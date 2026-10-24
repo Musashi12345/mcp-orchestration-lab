@@ -131,6 +131,8 @@ async def test_database_save_failure_stops_dependent_work(lab, monkeypatch):
     attempts = await lab.store.list_records(handoff.run_id, "tool_attempt")
     assert len(attempts) == 1
     assert attempts[0]["payload"]["status"] == "RUNNING"
+    final = (await lab.store.list_records(handoff.run_id, "execution_result"))[-1]["payload"]
+    assert final["states"]["count"] == "FAILED"
 
 
 async def test_cancellation_is_recorded_and_no_dependent_step_starts(lab):
