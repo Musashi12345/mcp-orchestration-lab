@@ -1,6 +1,6 @@
-# Running the planner and DAG executor
+# Running the planner and executors
 
-Updated: 2026-10-23.
+Updated: 2026-10-25.
 
 ## What is available
 
@@ -10,7 +10,7 @@ The planner discovers configured MCP tools and saves their exact definitions. It
 
 The executor starts ready work within the concurrency limit, calls the exact server/tool named by each step, and saves outcomes before starting dependent work. It supports conditions, explicit alternatives, recorded failures, bounded retries, confirmed-result reuse, and D2 revisions with references to completed outputs.
 
-The six LLM data-analysis workers are implemented. See [the agent guide](../Agents/Running.md) for their methods, limits, API, and one-command start/stop scripts. The example MCP server remains a deterministic test fixture. CSV runs support D1/D2/P1. [P1](P1.md) uses a new CSV-only Docker image and the same tool gate. P2 remains unimplemented. The older pricing code and its Python runner have been removed; previous run evidence is retained.
+The six LLM data-analysis workers are implemented. See [the agent guide](../Agents/Running.md) for their methods, limits, API, and one-command start/stop scripts. The example MCP server remains a deterministic test fixture. CSV runs support D1/D2/P1/P2. [P1](P1.md) and [P2](P2.md) share a CSV-only Docker image and the same tool gate. P2 adds main-planner reviews and fresh runners for revisions. The older pricing code and its Python runner have been removed; previous run evidence is retained.
 
 ## Local PostgreSQL and files
 
@@ -48,7 +48,7 @@ Use `configs/agents_stdio.yaml` for CLI-owned agent processes, or `configs/agent
 - Each server may expose multiple tools. Different servers may expose tools with the same name; the server ID keeps them distinct.
 - `model` configures the existing Codex login route or a trusted local command router.
 - `limits` controls simultaneous work, calls, attempts, time, input size, and observed token usage.
-- `task_rules` defines the two fixed review rules used for matching D1/D2 tasks.
+- `task_rules` defines the two fixed review rules used across matched modes. D2/P2 require them.
 
 The example server, `tests/mcp_analysis_server.py`, reads registered synthetic CSVs and returns deterministic results. It is not an LLM agent or a measured worker benchmark. Its simple tool descriptions are copied into the discovery cache with the raw definitions; the application does not invent missing capabilities.
 
@@ -90,11 +90,23 @@ To plan and execute in one command:
 
 The installed `mcp-analysis` command exposes the same actions.
 
-## D1 and D2 review rules
+## Shared review rules
 
 D1 follows its original plan, including written conditions. At a review boundary it records passage without asking the main model again.
 
 D2 can ask the main model to keep, revise, or stop the remaining work. A revision is validated and saved as a new plan version. Prior outputs remain linked to their original producing attempts.
+
+P2 uses the same review controller and public observations. KEEP resumes its existing
+Python runner; REVISE starts a fresh runner with verified selected results after the old
+container is removed; STOP records its reason. D1/P1 never make main-planner execution
+review calls. Build the shared image first with
+`analysis runner-build --config configs/agents_stdio.yaml`, then select `--mode P2`
+on `analysis plan` or `analysis run`. See [P2](P2.md) for the continuation contract.
+
+In D2/P2 reviews, `recoveries` maps replacement step IDs to the host-provided
+`unresolved_failures` IDs they handle. Only success resolves those earlier failures;
+replacing work does not erase them. Selected snapshot envelopes must fit the shared
+`max_result_bytes` allowance. These controls apply to both representations.
 
 The current task rule is a configured finished-step count, independent of agent names. It counts successful and known-failed attempted steps. Blocked or skipped steps do not create extra tool calls. The example configuration places reviews after the first and second finished steps; choose and freeze task rules before any measured comparison.
 
@@ -108,7 +120,7 @@ For a planned backup after a known failure, use `dependency_policy: settled`, a 
 
 - Execution completion means the plan's required work finished. That execution record keeps `task_success` unknown and `evaluation_status` as `NOT_EVALUATED`. The separate [evaluation mechanism](../evaluation/Running.md) grades the exact published development tasks and saves run-linked evaluation records.
 - Worker outputs use structured JSON with registered file references. A non-completed worker outcome fails that step; receiving an MCP reply alone does not mean the job succeeded.
-- Worker-generated analysis code is not supported. P1 runs only its limited main orchestration program in the new Docker image; data calculations stay in the agents. Generated code never runs in the host process. The old pricing runner remains removed.
+- Worker-generated analysis code is not supported. P1/P2 run only limited main orchestration programs in Docker; data calculations stay in the agents. Generated code never runs in the host process. The old pricing runner remains removed.
 - The connection manager uses the official SDK for stdio and local streamable HTTP. Remote hosting is outside this version.
 - Worker AI calls share the run's live allowance and are saved with their worker/attempt links. The worker support service only grants access to supplied files and checked output publication.
 - Automatic restart of running or uncertain actions is not implemented. A confirmed saved result can be reused within the run; an unknown outcome is not silently replayed.
@@ -134,9 +146,9 @@ $env:MCP_LAB_POSTGRES_TEST = '1'
 
 This starts and stops a separate temporary, password-protected PostgreSQL cluster on a free local port. It does not need or alter the existing PostgreSQL service's login. Windows restricted shells may prevent `initdb` from starting; use a normal user terminal for this integration check.
 
-The old pricing runner and its checks were removed. The new CSV P1 image is separate.
+The old pricing runner and its checks were removed. The CSV P1/P2 image is separate.
 Build it with `analysis runner-build --config configs/agents_stdio.yaml` and set
-`MCP_LAB_DOCKER_TEST=1` to include real P1 container tests. Native PostgreSQL tests can
+`MCP_LAB_DOCKER_TEST=1` to include real P1/P2 container tests. Native PostgreSQL tests can
 be enabled at the same time. Fixed model replies are used unless live testing is explicitly
 enabled.
 

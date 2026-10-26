@@ -17,14 +17,14 @@ Records use local PostgreSQL; original CSV copies and generated files stay on di
 | D1 | Model-created DAG; no main-planner review calls during execution. |
 | D2 | Same runtime, with two configured review opportunities for remaining work. |
 | P1 | Model writes one Python program; Docker runs it through the shared MCP tool gate. No main-planner calls during execution. |
-| P2 | Not implemented. |
+| P2 | The same Python/Docker runtime, with D2's review opportunities and fresh runners for accepted remaining-work revisions. |
 
-D1 can still use model calls for initial planning and inside selected agents. D2 review
+D1 can still use model calls for initial planning and inside selected agents. D2/P2 review
 thresholds count finished attempted steps; short graphs may leave a review unreached.
 Execution completion is separate from independent evaluation of the answer.
 
 The superseded pricing experiments, generated-Python container runner, old grader, and
-old dashboard have been removed. The new CSV P1 runner requires Docker with Linux containers;
+old dashboard have been removed. The shared CSV Python runner requires Docker with Linux containers;
 D1/D2 do not. Earlier run files,
 databases, batches, and reports are retained as historical evidence. See the
 [cleanup/current-state note](docs/Cross-check/README.md).
@@ -66,7 +66,7 @@ For a CLI run with client-owned MCP subprocesses:
 accepted, unstarted run. Submitting a run uses configured model allowance. Keep both
 PostgreSQL and the file root when backing up evidence.
 
-For P1, build the separate runner image first, then use `--mode P1`:
+For P1/P2, build the shared runner image first, then choose `--mode P1` or `--mode P2`:
 
 ```powershell
 .\scripts\lab.ps1 analysis runner-build --config configs/agents_stdio.yaml
@@ -78,11 +78,13 @@ non-root user with no network or host mounts, a read-only image, 1 CPU, 512 MiB 
 64 processes, and 16 MiB temporary space. It receives references and checked results
 over pipes. Rebuild after changing `program_sdk`; execution refuses an outdated image.
 See [P1 details](docs/Planner%20and%20Executor/P1.md).
+For P2's `KEEP`/`REVISE`/`STOP`, saved results, and recovery declarations, see
+[P2 details](docs/Planner%20and%20Executor/P2.md).
 
 ## Evaluation and checks
 
 The CSV evaluator has ten synthetic CSVs and fifteen public development tasks, independent
-answer checks, run-linked grades, human review, and matched D1/D2/P1 reports.
+answer checks, run-linked grades, human review, and explicit matched D1/D2/P1/P2 reports.
 
 ```powershell
 .\scripts\lab.ps1 eval list
@@ -104,6 +106,11 @@ See [the saved results](reports/csv_cleanup_2026-10-23/README.md).
 The subsequent P1 validation passed **180 tests with 1 live-model skip**, including real
 Docker, MCP, native PostgreSQL, and service lifecycle checks. See [P1 test evidence](reports/p1_validation_2026-10-23/README.md).
 
+P2 validation on 2026-10-25 passed Ruff/formatting and verified **221 non-live tests
+across the full run and targeted completion, with 1 live-model skip**, including real
+Docker/MCP, native PostgreSQL, API/service lifecycle, and matched four-mode independent
+evaluation. See [P2 evidence](reports/p2_validation_2026-10-25/README.md).
+
 ## Code and guides
 
 - `src/mcp_execution_lab/orchestration/`: planner, graph checks, executor, MCP adapter,
@@ -113,6 +120,7 @@ Docker, MCP, native PostgreSQL, and service lifecycle checks. See [P1 test evide
   matched batches, and reports.
 - [Agent methods and running guide](docs/Agents/Running.md)
 - [Planner/executor running guide](docs/Planner%20and%20Executor/Running.md)
+- [P2 behavior and implementation plan](docs/Planner%20and%20Executor/P2.md)
 - [CSV evaluation guide](docs/evaluation/Running.md)
 - [Research controls](docs/experiment_protocol.md)
 - [Progress](docs/progress.md) and [current limits](docs/limitations.md)

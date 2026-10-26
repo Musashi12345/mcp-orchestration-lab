@@ -19,9 +19,12 @@ def count_program(context):
     }
 
 
-async def test_p1_planning_is_direct_python_with_saved_source_and_no_tool_execution(lab):
+@pytest.mark.parametrize("mode", ["P1", "P2"])
+async def test_python_planning_is_direct_with_saved_source_and_no_tool_execution(lab, mode):
+    from .test_executor import reviews
+
     lab.client.overrides["program"] = lambda request: count_program(request["context"])
-    handoff = await lab.planner.plan("Count rows", [lab.source], mode="P1")
+    handoff = await lab.planner.plan("Count rows", [lab.source], mode=mode, rules=reviews())
     assert handoff.plan is None and handoff.program
     assert not await lab.store.list_records(handoff.run_id, "plan")
     assert not await lab.store.list_records(handoff.run_id, "tool_attempt")
@@ -109,6 +112,7 @@ def test_calls_must_match_jobs_once_and_parallel_calls_must_be_awaited():
         PythonProgram(source="x", outputs=["answer", "answer"])
 
 
-async def test_unsupported_p2_stays_unavailable(lab):
-    with pytest.raises(OrchestrationError, match="Supported modes"):
+async def test_p2_requires_two_public_review_rules(lab):
+    with pytest.raises(OrchestrationError, match="two task-defined"):
         await lab.planner.plan("Count rows", [lab.source], mode="P2")
+    assert not lab.client.requests

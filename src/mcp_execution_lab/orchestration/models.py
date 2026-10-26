@@ -269,20 +269,38 @@ class ReviewDecision(Record):
     reason: str
     breakdown: Breakdown | None = None
     replacement: Plan | None = None
+    recoveries: dict[str, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def replacement_rules(self):
         revised = self.decision == "REVISE"
         if revised != (self.replacement is not None and self.breakdown is not None):
             raise ValueError("REVISE requires a replacement and its breakdown.")
-        if not revised and (self.replacement is not None or self.breakdown is not None):
+        if not revised and (
+            self.replacement is not None or self.breakdown is not None or self.recoveries
+        ):
             raise ValueError("KEEP and STOP cannot contain replacement work.")
+        return self
+
+
+class ProgramReviewDecision(ReviewDecision):
+    """A remaining-work program and the public result IDs it needs at startup."""
+
+    replacement: PythonProgram | None = None
+    preserve: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def preserved_results(self):
+        if len(set(self.preserve)) != len(self.preserve):
+            raise ValueError("Preserved result IDs must be distinct.")
+        if self.decision != "REVISE" and self.preserve:
+            raise ValueError("Only REVISE can select continuation results.")
         return self
 
 
 class Handoff(Record):
     run_id: str
-    mode: Literal["D1", "D2", "P1"]
+    mode: Literal["D1", "D2", "P1", "P2"]
     task: MainTask
     datasets: list[Dataset]
     cache: ToolCache
@@ -294,14 +312,19 @@ class Handoff(Record):
     plan_record: str
     version: int = 1
     rules: TaskRules
+    continuation: FileRef | None = None
 
     @model_validator(mode="after")
     def representation_matches_mode(self):
-        if self.mode == "P1":
+        if self.mode in {"P1", "P2"}:
             if self.program is None or self.plan is not None:
-                raise ValueError("P1 requires a Python program and no DAG.")
+                raise ValueError("P1/P2 require a Python program and no DAG.")
         elif self.plan is None or self.program is not None:
             raise ValueError("D1/D2 require a DAG and no Python program.")
+        if self.mode in {"D2", "P2"} and len(self.rules.reviews) != 2:
+            raise ValueError("D2/P2 require two task-defined review points.")
+        if self.continuation is not None and (self.mode != "P2" or self.version <= 1):
+            raise ValueError("Only a revised P2 program can have continuation inputs.")
         return self
 
 

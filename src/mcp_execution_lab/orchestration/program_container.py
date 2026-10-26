@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -17,6 +18,10 @@ SDK_DIRECTORY = PROJECT / "src/mcp_execution_lab/program_sdk"
 BASE_IMAGE = (
     "python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704"
 )
+
+
+class ProgramRevised(Exception):
+    """Host-controlled supersession after all underlying tool work has settled."""
 
 
 def sdk_identity():
@@ -71,9 +76,49 @@ async def build_image(config):
     return await image_identity(config)
 
 
+async def inspect_image(reference):
+    try:
+        return json.loads(await docker("image", "inspect", reference))[0], "reference"
+    except OrchestrationError as original:
+        if "no such image" not in str(original).lower():
+            raise
+        # Some Desktop stores list a valid tag but cannot inspect it by name. Require
+        # one exact tag match, then independently check that immutable image's tags.
+        tag = reference
+        if "@" not in tag and ":" not in tag.rsplit("/", 1)[-1]:
+            tag += ":latest"
+        rows = await docker(
+            "image",
+            "ls",
+            "--no-trunc",
+            "--filter",
+            f"reference={tag}",
+            "--format",
+            "{{json .}}",
+        )
+        try:
+            matches = set()
+            for line in rows.decode().splitlines():
+                row = json.loads(line)
+                identity = row.get("ID", "")
+                if row.get("Repository", "") + ":" + row.get("Tag", "") == tag and re.fullmatch(
+                    r"sha256:[a-f0-9]{64}", identity
+                ):
+                    matches.add(identity)
+            if len(matches) != 1:
+                raise original
+            identity = matches.pop()
+            info = json.loads(await docker("image", "inspect", identity))[0]
+            if info.get("Id") != identity or tag not in info.get("RepoTags", []):
+                raise original
+        except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+            raise original from exc
+        return info, "verified_tag_index"
+
+
 async def image_identity(config):
     try:
-        info = json.loads(await docker("image", "inspect", config.image))[0]
+        info, resolution = await inspect_image(config.image)
     except OrchestrationError as exc:
         raise OrchestrationError(
             "P1_IMAGE", "Build the CSV P1 image with analysis runner-build."
@@ -88,6 +133,8 @@ async def image_identity(config):
         )
     return {
         "image_id": info["Id"],
+        "configured_image": config.image,
+        "resolution": resolution,
         "sdk_sha256": expected,
         "base_image": BASE_IMAGE,
         "policy": VERSION,

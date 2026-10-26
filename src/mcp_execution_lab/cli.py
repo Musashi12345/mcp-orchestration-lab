@@ -24,7 +24,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="CSV data-analysis research harness")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("analysis", help="Plan, execute, and inspect CSV runs")
-    commands.add_parser("eval", help="Grade CSV runs and compare D1/D2/P1 development batches")
+    commands.add_parser("eval", help="Grade CSV runs and compare D1/D2/P1/P2 development batches")
     commands.add_parser("models", help="List models available through the local Codex CLI")
     parser.parse_args(arguments)
     try:

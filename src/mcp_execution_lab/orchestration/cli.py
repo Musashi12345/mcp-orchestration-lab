@@ -67,7 +67,7 @@ def main(argv=None):
         command.add_argument("--query", required=True)
         command.add_argument("--csv", type=Path, action="append", required=True)
         command.add_argument("--config", type=Path, required=True)
-        command.add_argument("--mode", choices=["D1", "D2", "P1"], default="D1")
+        command.add_argument("--mode", choices=["D1", "D2", "P1", "P2"], default="D1")
         command.add_argument("--encoding", default="utf-8-sig")
         command.add_argument("--delimiter", default=",")
     args = parser.parse_args(argv)

@@ -1,9 +1,9 @@
 # Current implementation and research limits
 
-The active application is CSV data analysis with D1/D2/P1. P2 is not implemented.
+The active application is CSV data analysis with D1/D2/P1/P2.
 The older pricing experiments, Python container runner, evaluator, and
 dashboard have been removed. Historical databases, runs, batches, and reports remain.
-P1 uses a new CSV-only Docker runner; D1/D2 do not need Docker. PostgreSQL stays native.
+P1/P2 share a CSV-only Docker runner; D1/D2 do not need Docker. PostgreSQL stays native.
 
 ## Planning and execution
 
@@ -13,17 +13,24 @@ P1 uses a new CSV-only Docker runner; D1/D2 do not need Docker. PostgreSQL stays
   Parallel draining can reach both at once; short plans can leave a review unreached.
 - Unknown outcomes are saved and stopped, not silently retried. Durable host-crash resume
   and reconciliation of unfinished external work are not implemented.
-- P1 permits one limited async Python function for calls, conditions, and parallel work.
+- P1/P2 permit one limited async Python function per version for calls, conditions, and parallel work.
   It forbids imports, loops, helpers, arithmetic, and direct file/network access. Data
   calculations remain in the agents. These language checks enforce the experiment's
   scope; Docker is the execution boundary. Shell, SQL, and arbitrary formulas are absent.
-- P1 uses the same broker, worker gateway, budgets, and attempt records as DAG runs.
+- P1/P2 use the same broker, worker gateway, budgets, and attempt records as DAG runs.
   It has one call site per assigned job; conditional jobs can be skipped. A successful
   fallback explicitly names confirmed failures it handles. Unknown outcomes stop the run.
+- P2 revisions start fresh containers; arbitrary Python locals are not preserved.
+  Selected verified result envelopes must fit `max_result_bytes` in aggregate, a bound
+  also applied to D2 revision snapshot bindings. Python startup also has a pipe-frame
+  limit. Results outside that bound cannot be silently truncated or reconstructed.
+  D2/P2 retain prior failures until a declared replacement step succeeds; earlier D2
+  records predate this control. The broker protects exact operation identities, not all
+  semantically similar work under fresh IDs.
 - The Docker daemon and local service processes are trusted. The container shares the
   Docker Linux kernel; this is not a separate VM per program. Host death can leave a
   container or external operation unfinished. No automatic crash reconciliation is claimed.
-- P1 records its exact image ID and SDK hash. A development image label checks local
+- Each P1/P2 runner records its exact image ID and SDK hash. A development image label checks local
   build freshness; it is not a signed software supply-chain guarantee. Rebuild after SDK
   changes. Existing saved handoffs from older source/configurations must be replanned.
 - The prompt-size check currently happens after reserving a model-call slot. An oversized
@@ -67,7 +74,8 @@ P1 uses a new CSV-only Docker runner; D1/D2 do not need Docker. PostgreSQL stays
   The paired batch runner supplies exactly the declared files. Fix this gap before treating
   arbitrary manually graded runs as equal-information research evidence.
 - Controlled service-failure recovery scoring, blinded review UI, statistical inference,
-  and a full four-mode comparison remain future work. No research winner is established.
+  and an unseen four-mode study remain future work. Explicit four-mode development
+  batches are supported. No research winner is established.
 
 The [dated pre-cleanup audit](Cross-check/2026-10-23-before-cleanup/README.md) describes the
 earlier source. Its removed-file links are historical. Current cleanup/test evidence is

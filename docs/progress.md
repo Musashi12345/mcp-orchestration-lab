@@ -1,5 +1,35 @@
 # Implementation progress
 
+## CSV P2 implemented and validated: 2026-10-25
+
+P2 now generates Python directly and uses the same host-defined review rules as D2.
+The shared review controller saves public snapshots and bounded correction attempts.
+KEEP resumes the same runner; REVISE starts remaining work in a fresh runner with
+verified saved results after the previous container is removed; STOP retains its reason.
+One broker, official MCP adapter, gateway, allowance, and deadline span all versions.
+
+D2 and P2 now preserve unresolved failures across revisions. A review can assign a
+replacement step to recover specific failure IDs; only that step's success clears them.
+The shared selected-snapshot byte bound is `max_result_bytes`. Earlier D2 evidence
+predates these controls and remains retained under its original source identity.
+
+CLI/API routing and explicit four-mode evaluation are implemented. Focused baseline
+validation passed 31 existing checks; the new snapshot/revision smoke passed 14 checks.
+Final-source Ruff/formatting passed for 111 Python files. The full check passed 205
+tests and skipped one before an existing worker-access test hit a Windows loopback
+reset. The unchanged case and remaining CLI/support checks passed in a 17-test
+completion run: **221 distinct non-live cases verified, 1 live-model skip**. Both
+reports and their combined coverage record are retained. An earlier core-source full
+run passed 215 tests and one skip before shared Docker image lookup was hardened.
+Real Docker, official MCP processes, native PostgreSQL, API/service lifecycle, and
+matched four-mode independent evaluation were enabled. The P2 evaluation episode
+used two containers, one worker tool attempt, and seven scripted model calls. Seven
+local services now run the final source, with six MCP tools and confirmed application
+database access. No live provider request was submitted. See
+[retained validation](../reports/p2_validation_2026-10-25/README.md),
+[P2](Planner%20and%20Executor/P2.md) and
+[the build checklist](Planner%20and%20Executor/P2_Implementation_Plan.md).
+
 ## CSV P1 implemented: 2026-10-23
 
 The shared CSV planner now accepts P1. Its last stage generates a limited async Python
@@ -71,18 +101,18 @@ and the managed services were stopped after testing.
 - Planner: actual MCP discovery, saved tool catalogue, CSV registration, Main Task,
   tool selection, subtasks, checked model-created DAG or Python, and accepted handoff.
 - Executor: readiness-based parallel scheduling, conditions, explicit failure branches,
-  saved attempts/results, uncertainty stops, D2 review/replacement plans, and P1 through
-  a separate Docker runner connected to the same tool runtime.
+  saved attempts/results, uncertainty stops, shared D2/P2 review policy, and P1/P2 through
+  Docker runners connected to the same tool runtime.
 - Agents: Understanding, Cleaning, Combining, Analysis, Prediction, and Report as six
   separate official-SDK MCP services with bounded model recipes and handwritten operations.
 - Storage/API: PostgreSQL records throughout the run, disk files with hashes/parent links,
   local API, and root start/stop scripts managing seven service processes.
 - Evaluation: fifteen public development tasks, ten synthetic CSVs, independent checks,
-  human review, native PostgreSQL grades, and matched D1/D2/P1 reports.
+  human review, native PostgreSQL grades, and explicit matched D1/D2/P1/P2 reports.
 
-P2 for CSVs, an unseen final collection, a new dashboard, broader prediction scoring,
-and controlled service-failure evaluation remain unimplemented. The user database still
-needs its own `.env` connection. Live worker-model quality has not been established.
+An unseen final collection, a new dashboard, broader prediction scoring, and controlled
+service-failure evaluation remain unimplemented. Each installation needs its own `.env`
+database connection. Live worker-model quality has not been established.
 
 ## Earlier evidence
 

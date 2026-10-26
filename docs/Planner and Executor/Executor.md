@@ -2,7 +2,7 @@
 
 Date: 2026-10-15
 
-Implementation update, 2026-10-23: the D1/D2 engine, six agents, and CSV P1 are implemented. P1 uses a separate Docker image with the same broker and runtime records. P2 remains future work. The older pricing implementation and its container runner have been removed. See [Running.md](Running.md) and [P1.md](P1.md).
+Implementation update, 2026-10-25: the D1/D2 engine, six agents, and CSV P1/P2 are implemented. Python modes share a Docker image and the DAG runtime's broker/records. D2/P2 share `reviews.py`; P2 revisions start fresh runners with checked saved results. The older pricing implementation and its container runner remain removed. See [Running.md](Running.md), [P1.md](P1.md), and [P2.md](P2.md).
 
 Related document: [Planner.md](Planner.md).
 
@@ -255,7 +255,7 @@ Planned work:
 - [x] Schedule newly ready steps as individual calls finish, within the shared concurrency limit.
 - [x] Add dynamic, reusable connections for the configured servers selected by the plan.
 - [x] Route new DAG tool requests through the tool-independent broker and official MCP adapter.
-- [ ] Connect future data-analysis Python execution to the same CSV broker with isolated execution.
+- [x] Connect data-analysis Python execution to the same CSV broker with isolated execution.
 - [x] Record worker AI calls and enforce the relevant run and worker allowances.
 - [x] Add saved step states, retries, reuse, blocked paths, and uncertain outcomes.
 - [x] Implement task-defined review points and D2 replacement plans without replaying valid work.

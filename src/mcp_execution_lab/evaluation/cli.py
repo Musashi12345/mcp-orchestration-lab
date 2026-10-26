@@ -78,7 +78,7 @@ def main(argv=None):
     batch = actions.add_parser("run", help="Run a fresh paired batch; uses the configured model")
     batch.add_argument("--config", required=True, type=Path)
     batch.add_argument("--task", action="append")
-    batch.add_argument("--modes", choices=["D1", "D2", "P1"], nargs="+", default=["D1", "D2"])
+    batch.add_argument("--modes", choices=["D1", "D2", "P1", "P2"], nargs="+", default=["D1", "D2"])
     batch.add_argument("--repeats", type=int, default=1)
     batch.add_argument("--seed", type=int, default=0)
     batch.add_argument("--max-model-calls", type=int, required=True)

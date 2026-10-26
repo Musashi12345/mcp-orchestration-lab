@@ -1,6 +1,6 @@
 # Data-analysis evaluation
 
-Updated: 2026-10-21. This is a development collection, not the final unseen research test.
+Updated: 2026-10-25. This is a development collection, not the final unseen research test.
 
 ## CSV contents
 
@@ -115,12 +115,22 @@ failures, uncertain work, and evaluation errors remain visible. Source/lock chan
 new work. There is no automatic resume or cross-run model-response cache. If a process
 is killed, inspect the retained records; incomplete runs are not silently replayed.
 
-The CSV execution path supports D1/D2/P1 through the same tool runtime. To include P1,
+The CSV execution path supports D1/D2/P1/P2 through the same tool runtime. To include Python,
 build the CSV image first with `analysis runner-build --config configs/agents_stdio.yaml`
-and pass `--modes D1 D2 P1` explicitly. P1 runs its saved Python program in Docker;
-the same independent checks grade its declared outputs. P2 remains unimplemented, so
-a complete four-mode comparison is not yet available. No Python score is manufactured
-from a DAG run. Fixed-reply integration batches are exploratory software checks.
+and pass `--modes D1 D2 P1 P2` explicitly. P1/P2 run saved Python in Docker;
+the same independent checks grade their declared outputs. P2 uses D2's review rules
+and starts a fresh runner for accepted revisions, reusing checked saved results.
+For the configured ceiling of 32 model requests per run, one four-mode block requires
+room for 128 requests:
+
+```powershell
+.\scripts\lab.ps1 eval run --config configs/agents_stdio.yaml --task sales_total --modes D1 D2 P1 P2 --repeats 1 --seed 7 --max-model-calls 128
+```
+
+D2/P2 require the same two configured review rules. Both preserve unresolved failures
+across revisions until a declared recovery step succeeds. Defaults still select D1/D2.
+No Python score is manufactured from a DAG run. Fixed-reply integration batches are
+exploratory software checks, including the native PostgreSQL four-mode test.
 
 ## Review and reports
 

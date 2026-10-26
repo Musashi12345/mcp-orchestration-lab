@@ -56,7 +56,7 @@ class Application:
         handoff = Handoff.model_validate(saved[-1]["payload"]["handoff"])
         budget, files, model = self.components()
         budget.restore(saved[-1]["payload"]["usage"])
-        if handoff.mode == "P1":
+        if handoff.mode in {"P1", "P2"}:
             runner = ProgramExecutor(
                 self.store,
                 files,

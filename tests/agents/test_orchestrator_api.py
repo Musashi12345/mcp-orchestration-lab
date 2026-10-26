@@ -6,7 +6,7 @@ import pytest
 from orchestration.postgres import LocalPostgres
 
 from mcp_execution_lab.orchestration.config import ModelConfig, Settings
-from mcp_execution_lab.orchestration.models import ServerConfig
+from mcp_execution_lab.orchestration.models import ReviewRule, ServerConfig, TaskRules
 from mcp_execution_lab.orchestration.server import create_app
 from mcp_execution_lab.orchestration.storage import Store
 
@@ -50,10 +50,10 @@ async def call(app, path, method="GET", body=None, token="test-admin"):
 @pytest.mark.skipif(
     os.environ.get("MCP_LAB_POSTGRES_TEST") != "1", reason="Native PostgreSQL opt-in required."
 )
-@pytest.mark.parametrize("mode", ["D1", "P1"])
+@pytest.mark.parametrize("mode", ["D1", "D2", "P1", "P2"])
 async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, monkeypatch, mode):
-    if mode == "P1" and os.environ.get("MCP_LAB_DOCKER_TEST") != "1":
-        pytest.skip("Real Docker opt-in required for P1.")
+    if mode in {"P1", "P2"} and os.environ.get("MCP_LAB_DOCKER_TEST") != "1":
+        pytest.skip("Real Docker opt-in required for Python.")
     cluster = await asyncio.to_thread(LocalPostgres(tmp_path / "postgres").start)
     store = Store(cluster.url)
     monkeypatch.setenv("MCP_LAB_DATABASE_URL", cluster.url)
@@ -69,6 +69,12 @@ async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, 
                 )
             ],
             model=ModelConfig(provider="command", model_id="deterministic-test"),
+            task_rules=TaskRules(
+                reviews=[
+                    ReviewRule(id="first", after_completed_steps=1),
+                    ReviewRule(id="second", after_completed_steps=2),
+                ]
+            ),
         )
         model = AgentModel(store, "data_understanding", "understand_data")
         app = create_app(settings, "test-admin", root=tmp_path, client=model)
@@ -91,17 +97,29 @@ async def test_orchestrator_api_plans_executes_and_reads_the_same_run(tmp_path, 
         assert status == 200 and planned["status"] == "READY_FOR_EXECUTION"
         run_id = planned["run_id"]
         assert len(model.requests) == 4
-        assert model.requests[-1]["stage"] == ("program" if mode == "P1" else "dag")
+        assert model.requests[-1]["stage"] == ("program" if mode in {"P1", "P2"} else "dag")
         status, result = await call(app, f"/runs/{run_id}/execute", "POST")
-        assert status == 200 and result["status"] == "COMPLETED"
-        assert len(model.requests) == 6
+        (tmp_path / "api-audit.json").write_text(
+            json.dumps(
+                {
+                    "response": result,
+                    "records": await store.list_records(run_id),
+                    "events": await store.history(run_id),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        assert status == 200 and result["status"] == "COMPLETED", result
+        expected_calls = 7 if mode in {"D2", "P2"} else 6
+        assert len(model.requests) == expected_calls
         status, saved = await call(app, f"/runs/{run_id}")
         assert status == 200 and saved["run"]["id"] == run_id
         assert any(row["kind"] == "worker_call" for row in saved["records"])
         status, listing = await call(app, "/runs")
         assert status == 200 and [row["id"] for row in listing["runs"]] == [run_id]
         status, _ = await call(app, f"/runs/{run_id}/execute", "POST")
-        assert status == 400 and len(model.requests) == 6
+        assert status == 400 and len(model.requests) == expected_calls
     finally:
         await store.close()
         await asyncio.to_thread(cluster.close)

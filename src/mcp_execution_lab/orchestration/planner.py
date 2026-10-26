@@ -102,11 +102,11 @@ class Planner:
     ):
         from .models import TaskRules
 
-        if mode not in {"D1", "D2", "P1"}:
-            raise OrchestrationError("MODE", "Supported modes are D1, D2, and P1.")
+        if mode not in {"D1", "D2", "P1", "P2"}:
+            raise OrchestrationError("MODE", "Supported modes are D1, D2, P1, and P2.")
         rules = rules or TaskRules()
-        if mode == "D2" and len(rules.reviews) != 2:
-            raise OrchestrationError("TASK_RULES", "D2 requires two task-defined review points.")
+        if mode in {"D2", "P2"} and len(rules.reviews) != 2:
+            raise OrchestrationError("TASK_RULES", "D2/P2 require two task-defined review points.")
         if not request.strip() or not sources:
             raise OrchestrationError("INPUT", "Provide a user request and at least one CSV.")
         run_id = await self.store.create_run(
@@ -260,7 +260,7 @@ class Planner:
         )
         plan, program = None, None
         context = common | {"breakdown": breakdown.model_dump()}
-        if mode == "P1":
+        if mode in {"P1", "P2"}:
             program = await self._generate(
                 run_id,
                 "program",
@@ -290,7 +290,7 @@ class Planner:
             payload = {"version": 1, "plan": plan.model_dump(), "valid": True}
         plan_id = await self.store.put(
             run_id,
-            "program" if mode == "P1" else "plan",
+            "program" if mode in {"P1", "P2"} else "plan",
             payload,
             parents=[("breakdown", breakdown_id), ("cache", cache_id), ("task", task_id)],
         )

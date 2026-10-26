@@ -36,6 +36,24 @@ class EvalModel(AgentModel):
         assert not any(
             key in text for key in ("expected_rows", "grader_sha256", "evaluation_result")
         )
+        if request["stage"] == "review" and "current_program" in request["context"]:
+            self.requests.append(request)
+            saved = next(iter(request["context"]["valid_outputs"]))
+            value = {
+                "decision": "REVISE",
+                "reason": "Publish the saved independent worker result",
+                "breakdown": {"selection": {"tool_keys": [], "reasons": []}, "subtasks": []},
+                "preserve": [saved],
+                "replacement": {
+                    "source": "async def run(sdk, inputs):\n"
+                    f'    return {{"answer": inputs["snapshot"][{saved!r}]["value"]}}\n',
+                    "outputs": ["answer"],
+                },
+            }
+            return {
+                "content": {"content_json": json.dumps(value)},
+                "usage": {"input_tokens": 10, "output_tokens": 10},
+            }
         if request["stage"] == "program":
             self.requests.append(request)
             dataset = request["context"]["datasets"][0]["ref"]["id"]
@@ -104,11 +122,20 @@ async def paired_check(store, tmp_path, modes=("D1", "D2")):
     if "P1" in modes:
         assert summary["modes"]["P1"]["passed"] == 1
         assert summary["comparisons"]["D1_to_P1"]["scored_pairs"] == 1
+    if "P2" in modes:
+        assert summary["modes"]["P2"]["passed"] == 1
+        assert summary["comparisons"]["P1_to_P2"]["scored_pairs"] == 1
+        assert summary["comparisons"]["D2_to_P2"]["scored_pairs"] == 1
     assert manifest["used_model_calls"] == len(client.requests)
     audits = []
     for episode in manifest["episodes"]:
         run_id = episode["run_id"]
         records = await store.list_records(run_id)
+        if episode["mode"] == "P2":
+            execution = next(r for r in records if r["kind"] == "execution_result")["payload"]
+            assert execution["plan_version"] == 2
+            assert len([r for r in records if r["kind"] == "program_container"]) == 2
+            assert len([r for r in records if r["kind"] == "tool_attempt"]) == 1
         assert len([r for r in records if r["kind"] == "evaluation_episode"]) == 1
         audits.append(
             {
@@ -149,11 +176,12 @@ async def test_native_postgres_saves_run_linked_evaluation_and_pair_reports(tmp_
     os.environ.get("MCP_LAB_POSTGRES_TEST") != "1" or os.environ.get("MCP_LAB_DOCKER_TEST") != "1",
     reason="Native PostgreSQL and real Docker opt-ins required.",
 )
-async def test_native_postgres_real_worker_and_docker_p1_share_independent_evaluation(tmp_path):
+@pytest.mark.parametrize("modes", [("D1", "D2", "P1"), ("D1", "D2", "P1", "P2")])
+async def test_native_postgres_real_worker_and_docker_share_independent_evaluation(tmp_path, modes):
     cluster = await asyncio.to_thread(LocalPostgres(tmp_path / "postgres").start)
     store = Store(cluster.url)
     try:
-        await paired_check(store, tmp_path, modes=("D1", "D2", "P1"))
+        await paired_check(store, tmp_path, modes=modes)
     finally:
         await store.close()
         await asyncio.to_thread(cluster.close)

@@ -1,7 +1,7 @@
 # CSV research controls
 
 This independent project studies how a model chooses and runs data-analysis work.
-The current application implements CSV D1/D2/P1. P2 remains planned. The older
+The current application implements CSV D1/D2/P1/P2. The older
 pricing-domain implementation has been removed.
 
 | Planned treatment | Representation | Main-planner execution review |
@@ -9,7 +9,7 @@ pricing-domain implementation has been removed.
 | D1, implemented | DAG | None |
 | D2, implemented | DAG | Two configured opportunities |
 | P1, implemented | Limited Python in Docker | None |
-| P2, future | Python | The same task review rule |
+| P2, implemented | Limited Python in Docker | The same task review rule as D2 |
 
 Worker agents may make model calls in every treatment. The distinction is execution
 review by the main planner. P1 uses the same CSV broker/runtime controls and a separate
@@ -21,7 +21,17 @@ The current Python treatment has no imports, loops, helper functions, or arithme
 Each assigned job has one call site; conditions may skip calls. Parallel work uses the
 same shared capacity limit and review barriers. A successful prewritten fallback names
 the confirmed failures it handles; unknown outcomes stop the run. Freeze this language
-subset and report it as a research limit. P2 has no implementation or measured score.
+subset and report it as a research limit. P2 shares that subset. No measured model-quality
+score or representation winner is established by deterministic implementation checks.
+
+P2 KEEP resumes the existing runner; REVISE starts a fresh runner for remaining work
+with explicitly selected verified result envelopes. The selection must fit
+`max_result_bytes` in aggregate; D2 revision snapshot bindings use the same bound.
+Python startup also has its framed-pipe limit. Do not repeat completed work to rebuild
+lost interpreter memory or reset allowances across versions. D2/P2 carry unresolved
+failures across revisions: a declared replacement step must succeed to resolve them.
+These controls were added on 2026-10-25; older D2 evidence retains its earlier source
+identity. Preserve the same controls across all new matched comparisons.
 
 Compare runs using the same public question, original CSVs, tool definitions, agent
 implementations, model/settings, budgets, concurrency, and review rules. Keep fresh run

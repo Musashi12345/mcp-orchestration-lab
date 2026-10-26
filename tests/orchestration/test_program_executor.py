@@ -92,11 +92,16 @@ async def test_container_actually_blocks_host_files_network_and_root_writes(lab,
     # Handwritten probe, executed only in the already confined container.
     probe = """import errno, json, os, socket
 from pathlib import Path
+memory_limit = Path("/sys/fs/cgroup/memory.max")
+pids_limit = Path("/sys/fs/cgroup/pids.max")
+if not memory_limit.exists():
+    memory_limit = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    pids_limit = Path("/sys/fs/cgroup/pids/pids.max")
 result = {"uid": os.getuid(), "project_present": Path("/workspace").exists(),
           "database_env": "MCP_LAB_DATABASE_URL" in os.environ,
           "agent_package": Path("/opt/runner/mcp_execution_lab").exists(),
-          "memory": Path("/sys/fs/cgroup/memory.max").read_text().strip(),
-          "pids": Path("/sys/fs/cgroup/pids.max").read_text().strip()}
+          "memory": memory_limit.read_text().strip(),
+          "pids": pids_limit.read_text().strip()}
 try:
     Path("/opt/runner/forbidden.txt").write_text("probe")
     result["root_write"] = True

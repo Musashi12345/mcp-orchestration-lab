@@ -2,7 +2,7 @@
 
 Date: 2026-10-09
 
-Implementation update, 2026-10-23: the D1/D2 planner, direct P1 Python generation, and six agents are implemented. P2 remains future work. The older pricing implementation has been removed. See [Running.md](Running.md) and [the P1 contract](P1.md). The design below includes future P2 work as well as implemented behavior.
+Implementation update, 2026-10-25: the D1/D2 planner, direct P1/P2 Python generation, and six agents are implemented. P2 uses shared D2 review rules for remaining work. The older pricing implementation has been removed. See [Running.md](Running.md), [P1](P1.md), and [P2](P2.md). The original design below is supplemented by those current contracts.
 
 ## 1. Purpose
 
@@ -21,8 +21,8 @@ The planner ends when a validated plan has been saved and is ready for the execu
 5. Ask the LLM to create the Main Task from the user request and file descriptions.
 6. Give the Main Task and tool cache to the LLM for a draft tool selection.
 7. Ask the LLM to create subtasks, assign tools, and refine its selection where needed.
-8. Ask the LLM to create the DAG from those subtasks and their required inputs and outputs.
-9. Check the DAG using code. Return specific errors to the LLM for a limited correction attempt if necessary.
+8. Ask the LLM to create a DAG for D1/D2 or Python directly for P1/P2 from those subtasks and their required inputs and outputs.
+9. Check the graph or restricted Python syntax using code. Return specific errors to the LLM for a limited correction attempt if necessary.
 10. Save the accepted plan and mark it ready for the executor.
 
 ```mermaid
@@ -244,7 +244,7 @@ For matched research runs, use the same input data, tool definitions, model sett
 
 Count every AI call used for Main Task creation, tool explanations when needed, selection, task breakdown, plan generation, and corrections. Record the roles separately from later worker and replanning calls. A cache of tool information is not a cache of answers to user tasks. Do not reuse generated task answers across measured runs.
 
-Future representations must use one shared CSV broker/runtime and the official MCP adapter. Private evaluator checks must remain unavailable to planning and generated work. There is currently no generated-code executor; future executable code requires an isolated design and must never run in the host process.
+All representations use one shared CSV broker/runtime and the official MCP adapter. Private evaluator checks remain unavailable to planning and generated work. P1/P2 generated code runs only in the restricted Docker runner, never in the host process.
 
 The exact pause points for data analysis will be defined with the executor. The old pricing-task sequence must not become a hidden requirement in the new planner.
 
@@ -258,6 +258,7 @@ The accepted handoff contains:
 - Saved tool-cache ID and fingerprint.
 - Final tool selection and assigned subtasks.
 - Accepted DAG ID, version, source, and validation result for D1/D2.
+- Accepted Python program/source hash for P1/P2; revised P2 handoffs also link their checked continuation artifact.
 - Declared final outputs.
 - Configured limits, usage already spent during planning, and the remaining allowance.
 - Agreed pause-point definitions when the executor design supplies them.
@@ -293,7 +294,7 @@ The old pricing source, fixtures, and tests were removed on 2026-10-23. Existing
 - [x] Add the saved planner handoff without automatically running the executor.
 - [x] Count planning calls and preserve source/configuration identities and previous run evidence.
 - [x] Extend the CSV path to P1 using the same worker and runtime rules.
-- [ ] Add P2 using those same rules.
+- [x] Add P2 using those same rules.
 - [x] Verify deterministic planning with genuine MCP discovery before the bounded real Codex smoke.
 
 Important verification cases:

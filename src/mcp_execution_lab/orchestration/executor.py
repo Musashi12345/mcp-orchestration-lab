@@ -6,6 +6,7 @@ from .bindings import Resolver
 from .graph import validate_plan
 from .models import Handoff, OrchestrationError, ReviewDecision
 from .provenance import source_identity
+from .reviews import checked_snapshot, review, snapshot_keys
 from .runtime import Runtime
 
 
@@ -25,28 +26,9 @@ class Executor(Runtime):
                     except BaseException:
                         await self._settle(cancel=True)
                         raise
-                    failures = {
-                        key for key, state in self.states.items() if state in {"FAILED", "BLOCKED"}
-                    }
-                    handled = set()
-                    nodes = {node.id: node for node in self.active.plan.steps}
-
-                    def recover(name):
-                        if name in failures and name not in handled:
-                            handled.add(name)
-                            for parent in nodes[name].depends_on:
-                                recover(parent)
-
-                    for node in nodes.values():
-                        if (
-                            node.dependency_policy == "settled"
-                            and self.states[node.id] == "SUCCEEDED"
-                        ):
-                            for parent in node.depends_on:
-                                recover(parent)
                     status = (
                         "FAILED"
-                        if failures - handled or len(outputs) != len(self.active.plan.outputs)
+                        if self._unhandled() or len(outputs) != len(self.active.plan.outputs)
                         else "COMPLETED"
                     )
         except BaseException as exc:
@@ -160,123 +142,41 @@ class Executor(Runtime):
                     raise
         return outputs
 
-    async def _review(self, rule):
-        self.reviews.add(rule.id)
-        record = {
-            "rule": rule.model_dump(),
-            "completed_steps": self.completed_count,
-            "status": "RUNNING",
-            "mode": self.active.mode,
-        }
-        review_id = await self.store.put(
-            self.active.run_id, "review", record, parents=[("plan", self.active.plan_record)]
+    def _unhandled(self):
+        failures = {key for key, state in self.states.items() if state in {"FAILED", "BLOCKED"}}
+        handled = set()
+        nodes = {node.id: node for node in self.active.plan.steps}
+
+        def recover(name):
+            if name in failures and name not in handled:
+                handled.add(name)
+                for parent in nodes[name].depends_on:
+                    recover(parent)
+
+        for node in nodes.values():
+            if node.dependency_policy == "settled" and self.states[node.id] == "SUCCEEDED":
+                for parent in node.depends_on:
+                    recover(parent)
+        return failures - handled
+
+    async def _validate_review(self, decision):
+        validate_plan(
+            decision.replacement,
+            decision.breakdown,
+            self.active.cache,
+            self.active.datasets,
+            self.budget.limits,
+            snapshots=self.snapshots,
+            completed=self.completed_ids,
         )
-        if self.active.mode == "D1":
-            await self.store.finish(
-                self.active.run_id, review_id, record | {"status": "PASSED_WITHOUT_MODEL"}
-            )
-            return
-        if self.broker.uncertain:
-            raise OrchestrationError(
-                "OUTCOME_UNKNOWN", "Cannot replan around unresolved operations."
-            )
-        observations, used = {}, 0
-        for key, ref in self.snapshots.items():
-            value = await self.files.read_json(self.active.run_id, ref)
-            from .models import canonical
+        self._validate_recoveries(decision, [step.id for step in decision.replacement.steps])
+        await checked_snapshot(self, snapshot_keys(decision.replacement))
 
-            size = len(canonical(value))
-            if used + size <= self.budget.limits.max_prompt_chars // 3:
-                observations[key] = value
-                used += size
-        context = {
-            "original_request": (await self.store.run(self.active.run_id))["payload"]["request"],
-            "main_task": self.active.task.model_dump(),
-            "datasets": [dataset.model_dump() for dataset in self.active.datasets],
-            "tool_cache": self.active.cache.model_dump(),
-            "task_rules": self.active.rules.model_dump(),
-            "review_rule": rule.model_dump(),
-            "current_plan": self.active.plan.model_dump(),
-            "current_breakdown": self.active.breakdown.model_dump(),
-            "states": self.states,
-            "valid_outputs": {key: ref.model_dump() for key, ref in self.snapshots.items()},
-            "observations": observations,
-            "completed_step_ids": sorted(self.completed_ids),
-        }
-        context["public_failures"] = []
-        for attempt in await self.store.list_records(self.active.run_id, "tool_attempt"):
-            payload = attempt["payload"]
-            if payload["status"] == "FAILED":
-                response = payload.get("response", {})
-                context["public_failures"].append(
-                    {
-                        "attempt_id": attempt["id"],
-                        "step_id": payload["step_id"],
-                        "code": payload.get("code"),
-                        "error": payload.get("error", "")[:2000],
-                        "response_excerpt": str(
-                            response.get("structured_content") or response.get("content", "")
-                        )[:2000],
-                    }
-                )
-        errors = []
-        try:
-            for attempt in range(self.budget.limits.correction_attempts + 1):
-                try:
-                    decision = await self.model.ask(
-                        self.active.run_id,
-                        "review",
-                        ReviewDecision,
-                        context | {"validation_errors": errors},
-                        parent=review_id,
-                    )
-                    await self.store.put(
-                        self.active.run_id,
-                        "review_candidate",
-                        decision.model_dump(),
-                        parents=[("review", review_id)],
-                    )
-                    if decision.decision == "REVISE":
-                        validate_plan(
-                            decision.replacement,
-                            decision.breakdown,
-                            self.active.cache,
-                            self.active.datasets,
-                            self.budget.limits,
-                            snapshots=self.snapshots,
-                            completed=self.completed_ids,
-                        )
-                    break
-                except OrchestrationError as exc:
-                    if exc.code not in {"MODEL_FORMAT", "PLAN_INVALID", "UNKNOWN_TOOL"}:
-                        raise
-                    errors = [{"code": exc.code, "message": str(exc)}]
-                    await self.store.put(
-                        self.active.run_id,
-                        "validation",
-                        {"stage": "review", "attempt": attempt, "valid": False, "errors": errors},
-                        parents=[("review", review_id)],
-                    )
-                    if attempt == self.budget.limits.correction_attempts:
-                        raise
-            await self.store.finish(
-                self.active.run_id,
-                review_id,
-                record | {"status": "SUCCEEDED", "decision": decision.model_dump()},
-            )
-        except BaseException as exc:
-            await self.store.finish(
-                self.active.run_id,
-                review_id,
-                record | {"status": "FAILED", "error": str(exc)[:2000]},
-            )
-            raise
-        if decision.decision == "STOP":
-            raise OrchestrationError("PLANNER_STOPPED", decision.reason)
-        if decision.decision == "REVISE":
-            await self._replace(decision)
+    async def _review(self, rule):
+        await review(self, rule, ReviewDecision, self._validate_review)
 
-    async def _replace(self, decision):
+    async def _replace(self, decision, *, review_id, snapshot_id):
+        await self._retire(decision)
         for name, state in self.states.items():
             if state in {"WAITING", "READY", "BLOCKED"}:
                 await self._state(name, "REPLACED")
@@ -298,6 +198,8 @@ class Executor(Runtime):
             parents=[
                 ("breakdown", breakdown_id),
                 ("previous_plan", old.plan_record),
+                ("review", review_id),
+                ("review_snapshot", snapshot_id),
                 ("cache", old.cache_record),
                 ("task", old.task_record),
             ],

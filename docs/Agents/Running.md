@@ -197,7 +197,7 @@ Cleaning and Combining also bound change records and output rows; Analysis limit
 and chart points. Exact typed tool definitions are the source of truth for argument rules.
 
 D1 still uses LLMs inside selected workers; it does not replan the main workflow during
-execution. D2 adds the two configured task reviews after the first and second finished
+execution. D2/P2 add the two configured task reviews after the first and second finished
 attempted steps. Short plans may leave a review unreached. This rule does not force two
 agents, any named agent, or unnecessary work. Freeze task rules and equal allowances
 before comparing treatments.
@@ -206,7 +206,7 @@ A result marked `COMPLETED` means execution finished its required work. Its exec
 record leaves `task_success` unknown (`NOT_EVALUATED`). The separate
 [evaluation commands](../evaluation/Running.md) can grade the published development
 tasks and save a run-linked result. See [remaining limits](../limitations.md)
-for prediction limits, missing Python treatments, and research boundaries.
+for prediction limits, Python continuation limits, and research boundaries.
 
 ## Validation
 

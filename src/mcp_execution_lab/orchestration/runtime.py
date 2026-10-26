@@ -21,6 +21,8 @@ class Runtime:
         self.reviews = set()
         self.running = {}
         self.broker = None
+        self.retired_failures = {}
+        self.review_recoveries = {}
 
     async def admit(self, handoff, current_source, needed):
         saved = await self.store.list_records(handoff.run_id, "handoff")
@@ -35,9 +37,9 @@ class Runtime:
             raise OrchestrationError(
                 "CODE_CHANGED", "Code or dependency lock changed after planning."
             )
-        if handoff.mode == "D2" and self.model is None:
+        if handoff.mode in {"D2", "P2"} and self.model is None:
             raise OrchestrationError(
-                "MODEL_CONFIG", "D2 needs a model for its task-defined reviews."
+                "MODEL_CONFIG", "D2/P2 need a model for their task-defined reviews."
             )
         if not needed <= {server.id for server in self.servers}:
             raise OrchestrationError(
@@ -47,6 +49,7 @@ class Runtime:
         self.active = handoff
         self.results, self.snapshots, self.states, self.running = {}, {}, {}, {}
         self.completed_ids, self.reviews, self.completed_count = set(), set(), 0
+        self.retired_failures, self.review_recoveries = {}, {}
 
     @asynccontextmanager
     async def tools(self, needed):
@@ -61,6 +64,11 @@ class Runtime:
 
     async def _finalize(self, status, outputs, error=None):
         handoff = self.active
+        if status == "FAILED" and self.broker is not None and self.broker.uncertain:
+            status = "UNCERTAIN"
+        if status == "COMPLETED" and self.retired_failures:
+            status = "FAILED"
+            error = OrchestrationError("RECOVERY_REQUIRED", "Earlier failures remain unresolved.")
         for rule in self.active.rules.reviews:
             if rule.id not in self.reviews:
                 await self.store.event(handoff.run_id, "review_unreached", rule.model_dump())
@@ -80,6 +88,7 @@ class Runtime:
             }
             if error
             else None,
+            "unresolved_failures": self._failure_context(),
         }
         await self.store.put(
             handoff.run_id, "execution_result", result, parents=[("plan", self.active.plan_record)]
@@ -124,8 +133,58 @@ class Runtime:
                 self.snapshots[ref.id] = ref
                 self.completed_ids.add(name)
                 self.completed_count += 1
+                for failure in self.review_recoveries.get(name, []):
+                    if self.retired_failures.pop(failure, None) is not None:
+                        await self.store.event(
+                            self.active.run_id,
+                            "failure_recovered",
+                            {
+                                "failure_id": failure,
+                                "step_id": name,
+                                "plan_id": self.active.plan_record,
+                            },
+                        )
         if fatal:
             raise fatal
+
+    def _unhandled(self):
+        return {name for name, state in self.states.items() if state == "FAILED"}
+
+    def _failure_context(self):
+        failures = dict(self.retired_failures)
+        for name in self._unhandled():
+            failures[f"{self.active.plan_record}:{name}"] = {
+                "step_id": name,
+                "plan_id": self.active.plan_record,
+                "version": self.active.version,
+                "state": self.states[name],
+            }
+        return failures
+
+    def _validate_recoveries(self, decision, steps):
+        failures = self._failure_context()
+        if not decision.recoveries.keys() <= set(steps):
+            raise OrchestrationError("PLAN_INVALID", "Recovery must name a replacement step.")
+        for selected in decision.recoveries.values():
+            if (
+                not selected
+                or len(selected) != len(set(selected))
+                or not set(selected) <= failures.keys()
+            ):
+                raise OrchestrationError("PLAN_INVALID", "Recovery must name unresolved failures.")
+
+    async def _retire(self, decision):
+        self.retired_failures = self._failure_context()
+        self.review_recoveries = decision.recoveries
+        await self.store.event(
+            self.active.run_id,
+            "version_superseded",
+            {
+                "plan_id": self.active.plan_record,
+                "unresolved_failures": self.retired_failures,
+                "recoveries": decision.recoveries,
+            },
+        )
 
     async def _settle(self, *, cancel=False):
         if not self.running:
