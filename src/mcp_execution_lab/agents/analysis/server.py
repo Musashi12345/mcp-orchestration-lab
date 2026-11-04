@@ -16,7 +16,13 @@ async def analyze_data(
     definitions: Definitions | None = None,
 ) -> Result:
     """Calculate checked filters, grouped totals, averages, changes, correlations and charts
-    from one registered CSV."""
+    from one registered CSV. Numeric sums and means use Decimal internally; exported
+    metrics are JSON integers or floating-point numbers, not exact Decimal JSON.
+    Saves JSON calculation evidence and a CSV table with group-by columns followed by
+    the recipe's named measures. With no grouping, the table has one row and only the
+    named measure columns. State required filters and measure names in the assigned job.
+    Returns registered artifact references and structured results; a requested chart
+    adds a PNG artifact."""
     return await execute(run_client(ctx), job, datasets, definitions or Definitions())
 
 

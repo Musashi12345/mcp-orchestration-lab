@@ -1,3 +1,6 @@
+import csv
+import io
+
 from mcp_execution_lab.agents.analysis.models import Comparison, Definitions, Measure, Recipe
 from mcp_execution_lab.agents.analysis.operations import analyze, chart
 from mcp_execution_lab.agents.common.models import Table
@@ -45,3 +48,32 @@ async def test_analysis_through_real_mcp(tmp_path):
     assert result["status"] == "COMPLETED"
     assert value["details"]["groups"][0]["metrics"]["total"] == 30
     assert any(data.startswith(b"\x89PNG") for data in published.values())
+
+
+async def test_discovered_analysis_contract_matches_filtered_decimal_table_and_evidence(tmp_path):
+    result, value, published, records = await agent_episode(
+        tmp_path,
+        "data_analysis",
+        "analyze_data",
+        {
+            "filters": [{"column": "status", "operation": "eq", "value": "completed"}],
+            "measures": [{"name": "total_amount_inr", "operation": "sum", "column": "amount"}],
+        },
+        csvs=["status,amount\ncompleted,10.1\ncompleted,0.2\ncancelled,999\n"],
+    )
+    assert result["status"] == "COMPLETED"
+    cache = next(row["payload"]["cache"] for row in records if row["kind"] == "tool_cache")
+    description = cache["tools"][0]["description"]
+    assert "Decimal internally" in description
+    assert "not exact Decimal JSON" in description
+    assert "one row" in description and "named measure columns" in description
+    tables = [
+        list(csv.DictReader(io.StringIO(published[ref["id"]].decode("utf-8-sig"))))
+        for ref in value["artifacts"]
+        if ref["kind"] == "csv"
+    ]
+    assert tables == [[{"total_amount_inr": "10.3"}]]
+    assert any(ref["kind"] == "json" for ref in value["artifacts"])
+    assert value["details"]["rows_used"] == 2
+    assert value["details"]["rows_excluded"] == 1
+    assert value["details"]["groups"][0]["metrics"] == {"total_amount_inr": 10.3}

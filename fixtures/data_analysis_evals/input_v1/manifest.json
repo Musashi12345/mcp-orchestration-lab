@@ -1,0 +1,111 @@
+{
+  "version": "input-1",
+  "purpose": "User-approved local CSV evaluation; inputs stay outside Git. No research result claimed.",
+  "requires_input_directory": true,
+  "files": {
+    "customers.csv": {
+      "sha256": "b981d996111e4a496a283bdcafcf852c41701520c82ecc996ad2f3d1c06b16ef",
+      "rows": 50,
+      "columns": [
+        "customer_id",
+        "customer_name",
+        "segment"
+      ]
+    },
+    "daily_sales.csv": {
+      "sha256": "bf80467d68f73035c501e28c6dea04d09006c067813c79ea647fe908c157c5c2",
+      "rows": 181,
+      "columns": [
+        "date",
+        "units_sold"
+      ]
+    },
+    "monthly_targets.csv": {
+      "sha256": "210dff22baaa4364f7701d4f8d5b74e35532f7b9684fec0940272e02fad2fe43",
+      "rows": 24,
+      "columns": [
+        "month",
+        "region",
+        "target_inr"
+      ]
+    },
+    "orders.csv": {
+      "sha256": "d79d807fe9f57904c8af9ffcf2a62134535afb40288520dc33ef5a025a73b2f5",
+      "rows": 500,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "orders_messy.csv": {
+      "sha256": "3da29bd3ef4dc1bb9c85ba39af20109676820d83a42f1640301800a2ec7bc689",
+      "rows": 506,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "orders_with_notes.csv": {
+      "sha256": "25cbf7e0346b39b1936601c13d0b4759f92c58602b5d5b11c21751dee1779f61",
+      "rows": 500,
+      "columns": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_id",
+        "region",
+        "status",
+        "amount_inr",
+        "notes"
+      ]
+    },
+    "payments.csv": {
+      "sha256": "0e9044c87c3f2803e881e975a17889a93d9728a9bd286a8e57099b7ea1be1548",
+      "rows": 550,
+      "columns": [
+        "payment_id",
+        "order_id",
+        "status",
+        "amount_inr"
+      ]
+    },
+    "products.csv": {
+      "sha256": "e06fb7f823dbe2741c79a7deb7f8ba357433f2be1ea3ea076e9ed38bd45080c9",
+      "rows": 15,
+      "columns": [
+        "product_id",
+        "product_name",
+        "category"
+      ]
+    },
+    "returns.csv": {
+      "sha256": "45a33c477939df03fdfaa1a9e10f2bec52481461388b88c38a79139d165c9fd2",
+      "rows": 40,
+      "columns": [
+        "return_id",
+        "order_id",
+        "status",
+        "refund_inr"
+      ]
+    },
+    "stock.csv": {
+      "sha256": "b4f3a785be207ec0ea8e0bc4d68d999bcfac7c3b8191252a20f548410f6dd078",
+      "rows": 30,
+      "columns": [
+        "product_id",
+        "warehouse",
+        "available_units"
+      ]
+    }
+  }
+}

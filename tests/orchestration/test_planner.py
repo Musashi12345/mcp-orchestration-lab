@@ -9,6 +9,8 @@ from mcp_execution_lab.orchestration.model import SYSTEM_PROMPT
 from mcp_execution_lab.orchestration.models import OrchestrationError, Plan
 
 from .conftest import example_records
+from .test_executor import reviews
+from .test_program_planner import count_program
 
 
 async def test_real_mcp_discovery_and_planning_never_execute_workers(lab):
@@ -34,6 +36,44 @@ async def test_real_mcp_discovery_and_planning_never_execute_workers(lab):
     assert [entry["sequence"] for entry in events] == list(range(1, len(events) + 1))
     stages = await lab.store.list_records(handoff.run_id, "stage")
     assert all(row["payload"]["status"] == "SUCCEEDED" for row in stages)
+
+
+@pytest.mark.parametrize("mode", ["D1", "D2", "P1", "P2"])
+async def test_all_initial_stages_explain_host_reviews_without_selecting_a_review_tool(lab, mode):
+    lab.client.overrides["program"] = lambda request: count_program(request["context"])
+    handoff = await lab.planner.plan("Count rows", [lab.source], mode=mode, rules=reviews())
+    saved = await lab.store.list_records(handoff.run_id, "model_call")
+    assert len(saved) == 4
+    for row in saved:
+        context = row["payload"]["request"]["context"]
+        contract = context["execution_contract"]
+        assert contract["mode"] == mode
+        assert contract["representation"] == ("python" if mode.startswith("P") else "dag")
+        assert contract["reviews"]["owner"] == "host_runtime"
+        assert contract["reviews"]["requires_mcp_tool"] is False
+        assert contract["reviews"]["model_replanning"] == mode.endswith("2")
+        assert context["task_rules"] == reviews().model_dump()
+        assert context["original_request"] == "Count rows"
+        assert not any(
+            term in json.dumps(contract).lower()
+            for term in ("data_analysis", "analyze_data", "fixture/", "expected_rows", "grader")
+        )
+    assert handoff.breakdown.selection.tool_keys == ["fixture/profile", "fixture/present"]
+    assert not await lab.store.list_records(handoff.run_id, "tool_attempt")
+
+
+async def test_host_contract_does_not_bypass_a_genuinely_missing_tool_capability(lab):
+    lab.client.overrides["tool_selection"] = {
+        "tool_keys": [],
+        "reasons": [],
+        "missing_capabilities": ["No supplied tool supports the requested operation."],
+    }
+    with pytest.raises(OrchestrationError, match="No supplied tool"):
+        await lab.planner.plan("Count rows", [lab.source])
+    run_id = lab.client.requests[0]["context"]["datasets"][0]["ref"]["run_id"]
+    assert (await lab.store.run(run_id))["status"] == "NEEDS_CLARIFICATION"
+    assert len(lab.client.requests) == 2
+    assert not await lab.store.list_records(run_id, "tool_attempt")
 
 
 async def test_multiple_tools_share_one_server_and_cache_is_stable(lab):

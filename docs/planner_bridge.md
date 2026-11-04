@@ -57,6 +57,12 @@ unknown in accounting rather than being treated as zero. It bounds stdout/stderr
 return codes, and applies timeouts. The current subprocess cleanup kills the direct
 child; it is not the managed service script's Windows process-tree cleanup.
 
+Optional flat fields `cached_input_tokens` and `reasoning_output_tokens` are kept as
+subsets of input and output, respectively. They are not added to total tokens again.
+Per-call records preserve raw usage as well as checked counts; batch reports separate
+planning, agent, and review use, including failures and corrections. No nested provider
+usage format is guessed. See [token accounting](evaluation/Running.md#token-accounting).
+
 A custom router is trusted host code and must keep credentials in its own local storage,
 not model context, YAML arguments, or stdout diagnostics. A separate custom routing
 application is not supplied by this adapter. It cannot enable executing generated Python

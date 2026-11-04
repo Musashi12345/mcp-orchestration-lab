@@ -127,10 +127,27 @@ async def paired_check(store, tmp_path, modes=("D1", "D2")):
         assert summary["comparisons"]["P1_to_P2"]["scored_pairs"] == 1
         assert summary["comparisons"]["D2_to_P2"]["scored_pairs"] == 1
     assert manifest["used_model_calls"] == len(client.requests)
+    assert manifest["comparison_scope"] == "whole_system"
+    assert manifest["planning_policy"] == "fresh_plan_per_episode"
+    for mode in modes:
+        usage = summary["modes"][mode]["token_usage"]
+        assert usage["by_phase"]["planning"]["tokens"] == 80
+        assert usage["by_phase"]["agent"]["tokens"] == 40
+        assert usage["by_phase"]["review"]["tokens"] == (20 if mode in {"D2", "P2"} else 0)
+        assert usage["input_tokens"] == usage["output_tokens"] == usage["tokens"] // 2
+        assert usage["cached_input_tokens"] is None  # Fixed replies omit this optional count.
+        assert usage["unknown_usage_calls"] == 0
+    assert (Path(result["directory"]) / "model_calls.csv").is_file()
+    assert (Path(result["directory"]) / "tokens_by_mode.csv").is_file()
     audits = []
     for episode in manifest["episodes"]:
         run_id = episode["run_id"]
         records = await store.list_records(run_id)
+        assert all(
+            r["payload"]["token_usage"]["tokens"] == 20
+            for r in records
+            if r["kind"] == "model_call"
+        )
         if episode["mode"] == "P2":
             execution = next(r for r in records if r["kind"] == "execution_result")["payload"]
             assert execution["plan_version"] == 2
@@ -155,6 +172,43 @@ async def test_paired_batch_uses_real_mcp_and_independent_grading(tmp_path):
     store = Store("sqlite://", allow_sqlite_for_tests=True)
     try:
         await paired_check(store, tmp_path)
+    finally:
+        await store.close()
+
+
+async def test_request_spacing_spans_planning_workers_and_review_with_real_mcp(tmp_path):
+    from datetime import datetime
+
+    store = Store("sqlite://", allow_sqlite_for_tests=True)
+    configured = settings()
+    configured = configured.model_copy(
+        update={"model": configured.model.model_copy(update={"request_gap_seconds": 0.03})}
+    )
+    try:
+        await store.initialize()
+        result = await run_batch(
+            store,
+            tmp_path / "files",
+            configured,
+            Suite(SUITE),
+            tmp_path / "batches",
+            task_ids=["sales_total"],
+            max_model_calls=16,
+            client=EvalModel(store),
+        )
+        for episode in result["manifest"]["episodes"]:
+            assert episode["status"] == "PASSED"
+            records = await store.list_records(episode["run_id"])
+            calls = [row for row in records if row["kind"] == "model_call"]
+            assert {row["payload"]["role"] for row in calls} >= {"initial_planner", "worker"}
+            if episode["mode"] == "D2":
+                assert any(row["payload"]["role"] == "replanner" for row in calls)
+            for previous, current in zip(calls, calls[1:], strict=False):
+                elapsed = datetime.fromisoformat(current["created_at"]) - datetime.fromisoformat(
+                    previous["payload"]["finished_at"]
+                )
+                assert elapsed.total_seconds() >= 0.03
+            assert any(row["kind"] == "model_wait" for row in records)
     finally:
         await store.close()
 

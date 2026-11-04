@@ -17,7 +17,7 @@ from .suite import Suite
 
 
 async def dispatch(args):
-    suite = Suite(args.suite)
+    suite = Suite(args.suite, input_directory=args.input_directory)
     if args.action == "list":
         return {
             "suite": suite.version,
@@ -64,6 +64,7 @@ def main(argv=None):
     parser.add_argument(
         "--suite", type=Path, default=Path("fixtures/data_analysis_evals/development")
     )
+    parser.add_argument("--input-directory", type=Path, help="Separate local CSV directory")
     actions = parser.add_subparsers(dest="action", required=True)
     actions.add_parser("list", help="List public questions without database or model work")
     grade = actions.add_parser("grade", help="Independently grade an ended run")

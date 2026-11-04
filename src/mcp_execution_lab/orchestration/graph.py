@@ -226,8 +226,9 @@ def validate_plan(plan, breakdown, cache, datasets, limits, *, snapshots=None, c
                 graph_error("The worker job must exactly match its assigned subtask.")
         schema = tool.input_schema
         properties = schema.get("properties", {})
-        if not set(schema.get("required", [])) <= node.arguments.keys():
-            graph_error("Required tool arguments are missing.")
+        missing = set(schema.get("required", [])) - node.arguments.keys()
+        if missing:
+            graph_error(f"{tool.key}: required tool arguments are missing: {sorted(missing)}.")
         if (
             schema.get("additionalProperties", True) is False
             and not node.arguments.keys() <= properties.keys()

@@ -7,6 +7,7 @@ from .executor import Executor
 from .files import Files
 from .model import ModelCalls
 from .model_clients import make_planner
+from .model_pacing import ModelPacer
 from .models import Handoff, OrchestrationError, fingerprint
 from .planner import Planner
 from .program_executor import ProgramExecutor
@@ -16,11 +17,14 @@ class Application:
     def __init__(self, store, root: Path, settings, *, client=None):
         self.store, self.root, self.settings = store, root, settings
         self.client = client or make_planner(settings.model)
+        self.model_pacer = ModelPacer(settings.model.request_gap_seconds)
 
     def components(self, limits=None):
         budget = Budget(limits or self.settings.limits)
         files = Files(self.root, self.store, budget.limits)
-        model = ModelCalls(self.client, self.settings.model, self.store, files, budget)
+        model = ModelCalls(
+            self.client, self.settings.model, self.store, files, budget, pacer=self.model_pacer
+        )
         return budget, files, model
 
     async def plan(self, request, sources, *, mode="D1", encoding="utf-8-sig", delimiter=","):

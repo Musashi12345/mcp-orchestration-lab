@@ -10,7 +10,7 @@ from decimal import Decimal
 
 
 def read(path):
-    with path.open(encoding="utf-8", newline="") as stream:
+    with path.open(encoding="utf-8-sig", newline="") as stream:
         return list(csv.DictReader(stream))
 
 
@@ -19,6 +19,10 @@ def total(rows, column):
 
 
 def expected(task, paths):
+    if task.reference == "input_v1":
+        from .input_answers import answer_tables
+
+        return answer_tables(task.id, paths)["answer_rows"]
     tables = {name: read(path) for name, path in paths.items()}
     if task.id in {"sales_total", "sales_chart", "sales_report", "sales_by_region"}:
         rows = [row for row in tables["orders.csv"] if row["status"] == "completed"]
@@ -94,7 +98,7 @@ def expected(task, paths):
     raise ValueError("No reference calculation for this task.")
 
 
-def forecast_rows(path):
+def forecast_rows(path, *, future_steps=3):
     """A public, explicitly requested last-observation exercise, not a model leaderboard."""
     source = sorted(enumerate(read(path), 2), key=lambda item: item[1]["date"])
     cut = len(source) * 4 // 5
@@ -115,6 +119,6 @@ def forecast_rows(path):
             "actual": "",
             "predicted": source[-1][1]["units_sold"],
         }
-        for i in range(1, 4)
+        for i in range(1, future_steps + 1)
     ]
     return result, [index for index, _ in source[:cut]], [index for index, _ in source[cut:]]

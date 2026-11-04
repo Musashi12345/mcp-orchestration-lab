@@ -1,0 +1,96 @@
+{
+  "title": "Three-question pilot summary",
+  "as_of": "2026-10-27",
+  "source": "Local saved comparison exports; no new model calls.",
+  "modes": [
+    {
+      "mode": "D1",
+      "questions": 3,
+      "latest_passed": 3,
+      "first_attempt_passed": 3,
+      "attempts_counted": 3,
+      "model_calls": 20,
+      "known_tokens": 398162,
+      "recorded_minutes": 29.91,
+      "phase_tokens": {
+        "planning": 313983,
+        "agent": 84179,
+        "review": 0
+      }
+    },
+    {
+      "mode": "D2",
+      "questions": 3,
+      "latest_passed": 3,
+      "first_attempt_passed": 2,
+      "attempts_counted": 4,
+      "model_calls": 25,
+      "known_tokens": 547927,
+      "recorded_minutes": 37.15,
+      "phase_tokens": {
+        "planning": 325198,
+        "agent": 84171,
+        "review": 138558
+      }
+    },
+    {
+      "mode": "P1",
+      "questions": 3,
+      "latest_passed": 3,
+      "first_attempt_passed": 3,
+      "attempts_counted": 3,
+      "model_calls": 20,
+      "known_tokens": 397568,
+      "recorded_minutes": 30.05,
+      "phase_tokens": {
+        "planning": 313315,
+        "agent": 84253,
+        "review": 0
+      }
+    },
+    {
+      "mode": "P2",
+      "questions": 3,
+      "latest_passed": 3,
+      "first_attempt_passed": 3,
+      "attempts_counted": 3,
+      "model_calls": 24,
+      "known_tokens": 533091,
+      "recorded_minutes": 36.66,
+      "phase_tokens": {
+        "planning": 313118,
+        "agent": 84074,
+        "review": 135899
+      }
+    }
+  ],
+  "findings": {
+    "question_mode_results": 12,
+    "latest_answers_passed": 12,
+    "first_attempt_passed": 11,
+    "included_attempts": 13,
+    "model_calls": 89,
+    "known_tokens": 1876748,
+    "planning_token_percent": 67.43654449078939,
+    "input_token_percent": 98.71788860305166,
+    "wait_percent_of_recorded_time": 84.4734,
+    "completed_reviews": 8,
+    "reviews_kept": 8,
+    "accepted_revisions": 0,
+    "d1_p1_tokens": 398162,
+    "d2_p2_tokens": 547927,
+    "p1_tokens": 397568,
+    "p2_tokens": 533091,
+    "d1_p1_difference_tokens": 594,
+    "d1_p1_difference_percent": 0.1494084030907894,
+    "d2_over_d1_percent": 37.614086728517535,
+    "p2_over_p1_percent": 34.088005070830654
+  },
+  "definitions": {
+    "planning": "Main-task, selection, subtask, and plan/program creation calls.",
+    "agent": "Calls made by selected data-analysis agents.",
+    "review": "D2/P2 execution-time main-planner review calls.",
+    "first_attempt_passed": "Questions whose first attempt passed the independent checker.",
+    "latest_passed": "Latest included answer for a question/mode pair passed the checker."
+  }
+}

@@ -17,6 +17,7 @@ class ModelConfig(Record):
     reasoning_effort: str = "low"
     command: list[str] = Field(default_factory=list)
     timeout_seconds: float = Field(default=90, gt=0)
+    request_gap_seconds: float = Field(default=0, ge=0, allow_inf_nan=False)
 
 
 class ProgramRunnerConfig(Record):

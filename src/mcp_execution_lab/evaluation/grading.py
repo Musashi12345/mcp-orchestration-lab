@@ -11,7 +11,11 @@ from ..orchestration.models import FileRef, OrchestrationError, fingerprint
 from ..orchestration.provenance import source_identity
 from ..orchestration.storage import identity
 from .answers import expected, forecast_rows
+from .comparison import rows_equal as rows_equal
+from .comparison import table_check
 from .evidence import collect
+from .input_checks import table_checks
+from .tokens import model_call_rows, token_report
 
 TERMINAL = {
     "COMPLETED",
@@ -23,67 +27,10 @@ TERMINAL = {
 }
 
 
-def rows_equal(actual, wanted, task):
-    if len(actual) != len(wanted) or not all(isinstance(row, dict) for row in actual):
-        return False
-    remaining = list(actual)
-
-    def equal(a, b):
-        for column in task.columns:
-            if column not in a or column not in b:
-                return False
-            left, right = str(a[column]), str(b[column])
-            if column in task.numeric_columns and left and right:
-                try:
-                    x, y = Decimal(left), Decimal(right)
-                    if (
-                        not x.is_finite()
-                        or not y.is_finite()
-                        or abs(x - y) > Decimal(task.tolerance)
-                    ):
-                        return False
-                except InvalidOperation:
-                    return False
-            elif left != right:
-                return False
-        return True
-
-    for row in wanted:
-        index = next((i for i, value in enumerate(remaining) if equal(value, row)), None)
-        if index is None:
-            return False
-        remaining.pop(index)
-    return True
-
-
-def table_check(outputs, wanted, task):
-    candidates = [
-        rows
-        for rows in outputs.tables
-        if rows and all(isinstance(row, dict) and set(task.columns) <= row.keys() for row in rows)
-    ]
-    return {
-        "id": "answer_rows",
-        "passed": bool(candidates) and all(rows_equal(rows, wanted, task) for rows in candidates),
-        "message": "Returned answer tables must match the requested rows and values. "
-        "Row order is ignored.",
-        "candidate_tables": len(candidates),
-        "expected_rows": wanted,
-    }
-
-
 def measurements(run, records, events):
     calls = [row for row in records if row["kind"] == "model_call"]
     attempts = [row for row in records if row["kind"] == "tool_attempt"]
-    known, complete = 0, True
-    for row in calls:
-        usage = row["payload"].get("result", {}).get("usage")
-        if not isinstance(usage, dict) or any(
-            type(usage.get(k)) is not int or usage[k] < 0 for k in ("input_tokens", "output_tokens")
-        ):
-            complete = False
-        else:
-            known += usage["input_tokens"] + usage["output_tokens"]
+    usage = token_report(model_call_rows(run, records))
     states = [event for event in events if event["kind"] == "run_state"]
     end = next(
         (
@@ -117,9 +64,10 @@ def measurements(run, records, events):
         "model_calls_by_role": dict(
             Counter(row["payload"].get("role", "planner") for row in calls)
         ),
-        "tokens": known if complete else None,
-        "known_tokens": known,
-        "usage_complete": complete,
+        "tokens": usage["tokens"],
+        "known_tokens": usage["known_tokens"],
+        "usage_complete": usage["usage_complete"],
+        "token_usage": usage,
         "tool_attempts": len(attempts),
         "tool_attempt_states": dict(Counter(row["payload"].get("status") for row in attempts)),
         "review_decisions": dict(
@@ -170,7 +118,23 @@ async def evaluate(store, files, suite, task_id, run_id):
             "EVAL_TASK_MISMATCH", "This run did not receive the exact public task."
         )
     records = await store.list_records(run_id)
-    datasets = [row for row in records if row["kind"] == "dataset"]
+    # Older worker-produced CSVs have links but predate the explicit origin marker.
+    generated = {
+        link["source_id"]
+        for link in await store.record_links(run_id)
+        if link["role"] in {"worker", "input"}
+    }
+    datasets = [
+        row
+        for row in records
+        if row["kind"] == "dataset"
+        and row["payload"].get("origin", "input") == "input"
+        and row["id"] not in generated
+    ]
+    if len(datasets) != len(task.files):
+        raise OrchestrationError(
+            "EVAL_INPUT_MISMATCH", "Run must receive exactly the task's declared original CSVs."
+        )
     originals = []
     for name in task.files:
         rows = [row for row in datasets if row["payload"]["dataset"]["filename"] == name]
@@ -226,7 +190,9 @@ async def evaluate(store, files, suite, task_id, run_id):
                 run_id, roots, files, input_ids={row["id"] for row in originals}
             )
             if task.kind == "forecast":
-                wanted, train, test = forecast_rows(paths["daily_sales.csv"])
+                wanted, train, test = forecast_rows(
+                    paths["daily_sales.csv"], future_steps=7 if task.reference == "input_v1" else 3
+                )
                 checks.append(table_check(outputs, wanted, task))
                 splits = [
                     doc
@@ -283,17 +249,20 @@ async def evaluate(store, files, suite, task_id, run_id):
                     and isinstance(doc.get("details"), dict)
                     and "baseline_metrics" in doc["details"]
                 ]
-                checks.append(
-                    {
-                        "id": "reference_error",
-                        "passed": bool(baselines)
-                        and all(
-                            score_close(m.get("mean_absolute_error"), error)
-                            and score_close(m.get("root_mean_squared_error"), rmse)
-                            for m in baselines
-                        ),
-                    }
-                )
+                if task.reference != "input_v1":
+                    checks.append(
+                        {
+                            "id": "reference_error",
+                            "passed": bool(baselines)
+                            and all(
+                                score_close(m.get("mean_absolute_error"), error)
+                                and score_close(m.get("root_mean_squared_error"), rmse)
+                                for m in baselines
+                            ),
+                        }
+                    )
+            elif task.reference == "input_v1":
+                checks.extend(table_checks(outputs, task, paths))
             else:
                 checks.append(table_check(outputs, expected(task, paths), task))
             if task.require_chart:
@@ -305,7 +274,7 @@ async def evaluate(store, files, suite, task_id, run_id):
                         "passed": any(text.strip() for text in outputs.reports),
                     }
                 )
-            if task.require_change_log:
+            if task.require_change_log and task.reference != "input_v1":
                 columns = ["source_row", "column", "old", "new", "removed"]
                 log_task = task.model_copy(update={"columns": columns, "numeric_columns": []})
                 changes = [

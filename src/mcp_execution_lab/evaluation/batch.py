@@ -8,18 +8,19 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from statistics import median
 
+from ..orchestration.atomic_json import save_json
 from ..orchestration.files import Files
 from ..orchestration.models import fingerprint
 from ..orchestration.provenance import source_identity
 from ..orchestration.service import Application
 from ..orchestration.storage import identity, now
+from ..orchestration.tokens import TOKEN_FIELDS
 from .grading import evaluate, grade_identity, measurements
+from .tokens import model_call_rows, token_report
 
 
 def save(path, value):
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    save_json(path, value)
 
 
 class EpisodeStore:
@@ -79,7 +80,11 @@ async def run_batch(
         "status": "RUNNING",
         "study_stage": "development",
         "exploratory": True,
+        "comparison_scope": "whole_system",
+        "planning_policy": "fresh_plan_per_episode",
         "suite_version": suite.version,
+        "suite_directory": str(suite.directory),
+        "input_directory": str(suite.input_directory),
         "suite_sha256": suite.digest,
         "grader_sha256": grade_identity(),
         **source_identity(),
@@ -189,6 +194,7 @@ async def report_batch(store, directory):
     directory = Path(directory).resolve()
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     rows = []
+    calls = []
     for episode in manifest["episodes"]:
         row = {k: episode.get(k) for k in ("task_id", "repeat", "mode", "run_id", "status")}
         row["task_success"] = None
@@ -204,11 +210,22 @@ async def report_batch(store, directory):
                 and r["payload"]["grader_sha256"] == manifest["grader_sha256"]
             ]
             metrics = measurements(run, records, await store.history(run["id"]))
+            calls.extend(
+                {
+                    "batch_id": manifest["batch_id"],
+                    "task_id": episode["task_id"],
+                    "repeat": episode["repeat"],
+                    **call,
+                }
+                for call in model_call_rows(run, records)
+            )
             row.update(
                 {
                     "execution_status": run["status"],
                     "is_model": run["payload"]["is_model"],
                     **metrics,
+                    **{key: metrics["token_usage"][key] for key in TOKEN_FIELDS},
+                    "unknown_usage_calls": metrics["token_usage"]["unknown_usage_calls"],
                 }
             )
             if evaluations:
@@ -228,6 +245,12 @@ async def report_batch(store, directory):
         "study_stage": "development",
         "modes": {},
         "comparisons": {},
+        "token_accounting": {
+            "basis": "provider_reported",
+            "includes": "All saved calls, including failed and correction attempts.",
+            "total": "input_tokens + output_tokens; cached/reasoning fields are subsets.",
+            "missing": "null means unknown; known_* fields are partial subtotals.",
+        },
     }
     for mode, values in grouped.items():
         attempted = [r for r in values if r.get("run_id")]
@@ -243,6 +266,9 @@ async def report_batch(store, directory):
             if attempted
             else None,
             "model_calls": sum(r.get("model_calls", 0) for r in attempted),
+            "token_usage": token_report([c for c in calls if c["mode"] == mode])
+            if attempted
+            else None,
             "median_total_seconds": median(
                 [r["total_seconds"] for r in attempted if r.get("total_seconds") is not None]
             )
@@ -270,6 +296,56 @@ async def report_batch(store, directory):
             ),
         }
     save(directory / "summary.json", summary)
+    with (directory / "model_calls.csv").open("w", encoding="utf-8", newline="") as stream:
+        columns = [
+            "batch_id",
+            "task_id",
+            "repeat",
+            "run_id",
+            "mode",
+            "call_id",
+            "parent_id",
+            "status",
+            "role",
+            "stage",
+            "phase",
+            "agent",
+            "provider",
+            "model_id",
+            "is_model",
+            "request_id",
+            "started_at",
+            "finished_at",
+            *TOKEN_FIELDS,
+            "tokens",
+            "known_tokens",
+            "usage_complete",
+        ]
+        writer = csv.DictWriter(stream, fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(calls)
+    token_rows = []
+    for mode, value in summary["modes"].items():
+        usage = value["token_usage"]
+        if usage is None:
+            continue
+        for phase, counts in {"all": usage, **usage["by_phase"]}.items():
+            token_rows.append({"mode": mode, "phase": phase, **counts})
+    with (directory / "tokens_by_mode.csv").open("w", encoding="utf-8", newline="") as stream:
+        columns = [
+            "mode",
+            "phase",
+            "model_calls",
+            "tokens",
+            "known_tokens",
+            "usage_complete",
+            "unknown_usage_calls",
+        ]
+        for key in TOKEN_FIELDS:
+            columns.extend([key, "known_" + key, "unknown_" + key + "_calls"])
+        writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(token_rows)
     with (directory / "episodes.csv").open("w", encoding="utf-8", newline="") as stream:
         columns = [
             "task_id",
@@ -284,6 +360,9 @@ async def report_batch(store, directory):
             "tool_attempts",
             "tokens",
             "known_tokens",
+            *TOKEN_FIELDS,
+            "usage_complete",
+            "unknown_usage_calls",
             "planning_seconds",
             "execution_seconds",
             "total_seconds",
@@ -306,6 +385,40 @@ async def report_batch(store, directory):
             f"| {mode} | {value['attempted']} | {value['passed']} | {value['failed']} "
             f"| {value['unresolved']} | {value['model_calls']} |"
         )
+    text += [
+        "",
+        "## Token use",
+        "",
+        "Each mode makes its own fresh plan from the same question and CSVs. "
+        "These counts compare the whole system, including planning, agents, and reviews.",
+        "",
+        "| Mode | Input | Output | Total | Known subtotal | Calls with unknown usage |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for mode, value in summary["modes"].items():
+        counts = value["token_usage"]
+        if counts is None:
+            text.append(f"| {mode} | No run | No run | No run | No run | No run |")
+            continue
+        cells = [
+            str(counts[key]) if counts[key] is not None else "unknown"
+            for key in (
+                "input_tokens",
+                "output_tokens",
+                "tokens",
+                "known_tokens",
+                "unknown_usage_calls",
+            )
+        ]
+        text.append(f"| {mode} | " + " | ".join(cells) + " |")
+    text += [
+        "",
+        "model_calls.csv lists every saved call, including failures and corrections, "
+        "without prompts or answers. tokens_by_mode.csv separates planning, agent, and review use. "
+        "summary.json also groups calls by agent. Empty token cells mean unknown. "
+        "Cached input and reasoning output are parts of input/output, so they are not added twice. "
+        "Fixed replies contain test counts and are not measured model token use.",
+    ]
     text += [
         "",
         "All attempts stay in the denominator. "

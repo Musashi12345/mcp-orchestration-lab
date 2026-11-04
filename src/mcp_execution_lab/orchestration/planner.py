@@ -15,6 +15,7 @@ from .models import (
     Selection,
     fingerprint,
 )
+from .planning_context import execution_contract
 from .programs import PROGRAM_INSTRUCTIONS, validate_program
 from .provenance import source_identity
 
@@ -197,15 +198,17 @@ class Planner:
                     "PLAN_INVALID", "Main Task has unregistered or missing datasets."
                 )
 
+        inputs = {
+            "original_request": request,
+            "datasets": [dataset.model_dump() for dataset in datasets],
+            "task_rules": rules.model_dump(),
+            "execution_contract": execution_contract(mode),
+        }
         task = await self._generate(
             run_id,
             "main_task",
             MainTask,
-            {
-                "original_request": request,
-                "datasets": [dataset.model_dump() for dataset in datasets],
-                "task_rules": rules.model_dump(),
-            },
+            inputs,
             check_task,
         )
         task_id = await self.store.put(
@@ -216,12 +219,9 @@ class Planner:
         )
         if task.clarification_questions:
             raise OrchestrationError("NEEDS_CLARIFICATION", "; ".join(task.clarification_questions))
-        common = {
-            "original_request": request,
+        common = inputs | {
             "main_task": task.model_dump(),
-            "datasets": [dataset.model_dump() for dataset in datasets],
             "tool_cache": cache.model_dump(),
-            "task_rules": rules.model_dump(),
         }
 
         def check_selection(selection):

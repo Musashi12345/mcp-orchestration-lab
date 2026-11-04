@@ -1,8 +1,19 @@
+import re
 from datetime import datetime
 
 from ..common.models import NeedsInput, Unsupported
 from ..common.operations import number, require_columns
 from .models import Details
+
+
+def cleaning_number(value):
+    """Comma groups mean thousands; malformed groups are never silently stripped."""
+    text = value.strip()
+    if "," in text:
+        if not re.fullmatch(r"[+-]?[0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?", text):
+            raise NeedsInput("Use three-digit comma groups and a period for the decimal point.")
+        text = text.replace(",", "")
+    return number(text)
 
 
 def clean(table, recipe, rules):
@@ -18,6 +29,7 @@ def clean(table, recipe, rules):
             "trim": column in rules.trim_columns,
             "fill": column in rules.fill_values,
             "replace": column in rules.replacements,
+            "normalize_label": column in rules.label_values,
             "parse_date": column in rules.date_formats,
             "convert_number": column in rules.number_columns,
             "remove_exact_duplicates": rules.remove_exact_duplicates,
@@ -43,6 +55,11 @@ def clean(table, recipe, rules):
                 new = rules.fill_values[column]
             elif action == "replace":
                 new = rules.replacements[column].get(old, old)
+            elif action == "normalize_label":
+                labels = {label.casefold(): label for label in rules.label_values[column]}
+                if old.casefold() not in labels:
+                    raise NeedsInput(f"Unexpected label in {column!r}: {old!r}.")
+                new = labels[old.casefold()]
             elif action == "parse_date" and old.strip():
                 try:
                     new = datetime.strptime(old, rules.date_formats[column]).isoformat()
@@ -51,7 +68,12 @@ def clean(table, recipe, rules):
                         f"Date in {column!r} does not match the permitted format."
                     ) from exc
             elif action == "convert_number" and old.strip():
-                new = format(number(old), "f")
+                try:
+                    new = format(cleaning_number(old), "f")
+                except NeedsInput as exc:
+                    raise NeedsInput(
+                        f"Invalid number in {column!r} at source row {source_row}: {exc}"
+                    ) from exc
             if remove or new != old:
                 changes.append(
                     {

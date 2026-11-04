@@ -58,5 +58,5 @@ Freeze a broader unseen collection, model/configuration, repeated-run design, an
 before drawing conclusions. The current new evaluator has no controlled service-failure
 recovery score or statistical proof of a representation winner.
 
-The earlier pricing protocol is retained only as
-[historical documentation](reference/pricing_pilot/experiment_protocol.md).
+The superseded pricing protocol is archived locally with the pre-commit cleanup records.
+The controls above apply to the current CSV comparison.

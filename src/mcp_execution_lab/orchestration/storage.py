@@ -207,6 +207,7 @@ class Store:
             if kind not in {
                 "stage",
                 "model_call",
+                "model_wait",
                 "tool_attempt",
                 "review",
                 "worker_call",
@@ -262,6 +263,16 @@ class Store:
                 dict(row)
                 for row in connection.execute(
                     select(events).where(events.c.run_id == run_id).order_by(events.c.sequence)
+                ).mappings()
+            ]
+        )
+
+    async def record_links(self, run_id):
+        return await self.transact(
+            lambda connection: [
+                dict(row)
+                for row in connection.execute(
+                    select(links).where(links.c.run_id == run_id)
                 ).mappings()
             ]
         )

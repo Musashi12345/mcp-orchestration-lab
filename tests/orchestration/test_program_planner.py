@@ -1,4 +1,5 @@
 import hashlib
+import json
 
 import pytest
 from pydantic import ValidationError
@@ -72,6 +73,36 @@ async def test_pre_execution_correction_retains_candidates_and_errors(lab):
         )
         == 2
     )
+
+
+async def test_bad_json_correction_preserves_usage_above_the_old_cap(lab):
+    lab.budget.limits = lab.budget.limits.model_copy(update={"max_observed_tokens": 300000})
+    lab.client.overrides["program"] = lambda request: count_program(request["context"])
+    original = lab.client.generate
+    attempts = []
+
+    async def reply(request, directory):
+        response = await original(request, directory)
+        if request["stage"] == "program":
+            if not attempts:
+                response["content"]["content_json"] = response["content"]["content_json"].replace(
+                    "async def", r"async \q def", 1
+                )
+                response["usage"] = {"input_tokens": 130000, "output_tokens": 10}
+            attempts.append(request)
+        return response
+
+    lab.client.generate = reply
+    handoff = await lab.planner.plan("Count rows", [lab.source], mode="P1")
+    assert handoff.program and len(attempts) == 2
+    assert attempts[1]["context"]["validation_errors"][0]["code"] == "MODEL_FORMAT"
+    records = await lab.store.list_records(handoff.run_id, "model_call")
+    calls = [record["payload"] for record in records if record["payload"]["stage"] == "program"]
+    assert [call["status"] for call in calls] == ["FAILED", "SUCCEEDED"]
+    assert calls[0]["token_usage"]["tokens"] == 130010
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(calls[0]["result"]["content"]["content_json"])
+    assert lab.budget.tokens > 120000 and lab.budget.tokens < 300000
 
 
 @pytest.mark.parametrize(

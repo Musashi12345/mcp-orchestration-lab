@@ -1,3 +1,4 @@
+import ast
 import csv
 import io
 import json
@@ -222,6 +223,15 @@ async def test_foreign_reference_cannot_be_smuggled_after_valid_reference(tmp_pa
 
 def test_grader_has_no_import_from_agent_operations():
     directory = Path(__file__).resolve().parents[2] / "src/mcp_execution_lab/evaluation"
-    assert not any("agents." in p.read_text() for p in directory.glob("*.py"))
+    for path in directory.glob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            names = (
+                [node.module or ""]
+                if isinstance(node, ast.ImportFrom)
+                else [item.name for item in node.names]
+                if isinstance(node, ast.Import)
+                else []
+            )
+            assert not any("agents" in name.split(".") for name in names)
     public = json.dumps([task.model_dump() for task in Suite(SUITE).tasks])
     assert "expected_rows" not in public

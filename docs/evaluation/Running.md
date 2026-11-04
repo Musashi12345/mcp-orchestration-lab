@@ -1,6 +1,76 @@
 # Data-analysis evaluation
 
-Updated: 2026-10-25. This is a development collection, not the final unseen research test.
+Updated: 2026-10-26. This is a development collection, not the final unseen research test.
+
+The ten CSVs under local `Input/` have a separate suite of 14 approved questions. See
+[the approved question plan](Input_Questions_Draft.md). The commands below still select
+the older development collection unless the Input suite is supplied explicitly.
+
+## Approved local Input suite
+
+After the original small batch, the user approved a 300,000-token per-run guard in
+`configs/experiments/csv_gap90_300k.yaml`. It keeps the previous model, model-call limit,
+90-second gap, run/tool time limits and reviews. It is a new configuration identity;
+old attempts are not relabeled. See [repairs](Repairs_2026-10-27.md).
+
+The questions and input hashes are versioned under `fixtures/data_analysis_evals/input_v1/`.
+The CSVs remain in `C:\Learning\R-Project\Input`, ignored by Git. The suite requires an
+explicit CSV directory; it does not silently copy or substitute the development files.
+
+```powershell
+.\scripts\lab.ps1 eval --suite fixtures/data_analysis_evals/input_v1 --input-directory Input list
+.\scripts\lab.ps1 eval --suite fixtures/data_analysis_evals/input_v1 --input-directory Input grade --run RUN_ID --task input_q01
+```
+
+Listing makes no database/model request. Grading uses the saved run and makes no model
+request. Inputs must match the frozen file hashes and the exact question; extra original
+CSVs are rejected. Generated CSVs have a host-saved origin marker and do not count as
+extra inputs. Older worker outputs are also recognized through their saved parent links;
+unmarked older CSVs without those links are treated conservatively as originals.
+
+Q01–Q09 cover filters, sums/counts, joins, cleaning, payments, refunds, targets and stock.
+Q10 checks an 80/20 time split and a last-value forecast for seven future observations,
+using source-row IDs (the user chose to leave the Prediction agent unchanged). Q11
+checks notes treated as data; Q12 asks for missing profit inputs; Q13 requires three
+independent totals; Q14 adds a report. Q04, Q12 and Q14 require human review.
+
+The reference calculations use Decimal arithmetic and do not import worker operations.
+Q05 checks the regional answer, actual cleaned CSV, every changed cell and every removed
+source row, calculated from these inputs rather than older fixture row numbers. Counts
+and stock values must match exactly; money allows 0.005 INR. Forecast predictions must
+match exactly, error scores allow 0.000001, and future actuals must be blank.
+
+The approved plan defines cleaning normalization before row removal. A change log must
+include cell edits even on rows later removed. The exact query states the saved table
+columns and log fields so all four modes receive the same requirements.
+
+The first live Q01 pilot attempted all four modes once and failed before execution;
+see [the findings](First_Live_Pilot_2026-10-26.md). The approved repair and second batch
+reached P1's correct internal calculation, but HTTP 429 prevented final publication and
+the other modes' planning. See [the restart record](Planner_Repair_and_Restart_2026-10-26.md).
+No complete live worker answer has been verified.
+Choose settings and a request ceiling before any further batch. Supply `--modes D1 D2
+P1 P2` explicitly for all four; the CLI's older D1/D2 defaults are unchanged.
+
+## Optional gap between model calls
+
+For the user-approved smaller Q01/Q05/Q10 experiment, see
+[the automatic queue guide](Small_Automatic_Batch.md). It preserves the original Q01
+attempts and launches Q05/Q10 in all four modes sequentially. Its file-check waits and
+90-second between-run gap are outside individual run timing; within-run spacing is
+still provided by `model.request_gap_seconds`.
+
+`model.request_gap_seconds` defaults to zero. A positive value spaces model calls after
+the previous call finishes, across planning, selected agents and reviews within the
+application instance/run. The wait is saved as `model_wait`, counts toward the existing
+run/tool time limits, and does not consume the model's reply timeout or another call.
+Separate app processes and other Codex chats do not share this gate.
+
+The user approved one Q01 D1 diagnostic with 90 seconds in
+`configs/diagnostics/d1_q01_gap90.yaml`; regular service configs remain unchanged.
+See [the diagnostic record](../../reports/d1_q01_gap90_2026-10-26/README.md).
+This is separate from a matched four-mode evaluation. Any eventual comparison needs
+the same gap rule in every mode. No new automatic provider retries are included.
 
 ## CSV contents
 
@@ -139,6 +209,9 @@ The batch returns its new directory under `reports/evaluation_batches/`:
 - `manifest.json`: frozen settings, hashes, seed, schedule, run IDs, allowance, and states.
 - `episodes.csv`: one row per scheduled episode, including failed or unresolved work.
 - `summary.json`: per-mode counts, resource totals, and matched pass/fail counts.
+- `model_calls.csv`: one row per saved model call, with run/task/repeat/mode IDs, provider,
+  model, role, stage, agent, status, parent record, times, and reported token counts.
+- `tokens_by_mode.csv`: total and planning/agent/review token use for each started mode.
 - `report.md`: a short readable summary.
 
 Run-linked evaluation records and detailed calls remain in PostgreSQL; data/output files
@@ -161,6 +234,46 @@ Measurements include main/worker model request counts, known/unknown tokens, too
 attempts and their states, review decisions, planning time, execution time, and total
 wall time. Subscription dollar cost stays unknown. Total wall time includes any gap
 between separately requested planning and execution; automated batches avoid that gap.
+
+### Token accounting
+
+`ModelCalls` saves a `RUNNING` call record before invoking the provider and saves the
+outcome, finish time, raw usage, and checked counts when it ends. These fields live in the
+existing run-linked PostgreSQL records; no new table migration is needed. Normal counts
+are non-negative integers. A missing, negative, boolean, or non-integer count is unknown.
+No count is estimated from text length. Timeout, cancellation, or service failure without
+reported usage remains unknown. A format failure with reported usage still counts those
+tokens. Every correction request is its own saved call and contributes separately.
+
+Each mode makes a fresh plan, so reports compare the whole system: initial planning,
+agent recipe/explanation calls, and D2/P2 reviews. Optional agent choices can change the
+number of worker calls. No selected job list is shared between the modes. The manifest
+saves this comparison scope and the fresh-plan policy.
+
+Total tokens are input plus output. Optional `cached_input_tokens` and
+`reasoning_output_tokens` are subset counts, not extra tokens. The Codex bridge keeps
+the raw `turn.completed.usage` fields described in the
+[official JSON output documentation](https://learn.chatgpt.com/docs/non-interactive-mode#make-output-machine-readable).
+Trusted command routers must return the same flat field names; provider-specific nested
+fields are retained raw but are not guessed or converted by this report.
+
+`summary.json` contains `token_usage` per mode; each saved evaluation contains it per run,
+including `by_phase`
+and `by_agent` groups. `input_tokens`, `output_tokens`, and `tokens` are null if a required
+count for that total is unavailable. Their `known_*` fields remain partial subtotals;
+`unknown_*_calls` records how many counts are missing. Input and output completeness
+are independent. Optional cache/reasoning completeness is independent of the main total.
+Empty CSV token cells mean unknown. A phase with no calls has zero use; a mode with no
+started run has no token summary. Active/crashed calls left `RUNNING` have unknown counts.
+
+Budget checks now include whichever input/output counts are known, even when the other
+field is missing. A failed provider request also marks runtime usage as incomplete.
+An unknown total is not a hard provider spending limit. The pre-existing oversized-prompt
+reservation gap is still documented in [limitations](../limitations.md).
+
+The exported call CSV omits prompts, responses, and model error text. Detailed source
+records remain local. Fixed-reply software tests supply invented token counts and are
+labelled `is_model=false`; they verify accounting rather than measure a model.
 
 Reports show confirmed passes divided by **all attempted runs**, with unresolved counts
 next to them. Paired pass/fail counts use fully scored pairs and separately count missing

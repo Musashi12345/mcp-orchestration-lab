@@ -2,10 +2,24 @@
 
 Date: 2026-10-21. Status: first version implemented; real-MCP tests use fixed model replies.
 
-Current public arguments are `job`, `dataset`, optional `rules`, and optional `profile`.
+Current public arguments are `job`, `dataset`, required explicit `rules`, and optional `profile`.
 Only explicitly allowed cleaning rules may change cells or remove rows. The worker saves
 a cleaned copy, per-change CSV, before/after facts, and source-row links. There is no
 separate public `options` argument. See [running instructions](Running.md).
+
+The 2026-10-27 repair makes missing rules a tool-schema error and makes empty rules a
+saved `NEEDS_INPUT` outcome before a worker model request. `label_values` lists the
+permitted labels for each declared column; the checked `normalize_label` operation
+matches them without regard to case and rejects unexpected values. Neither columns nor
+label choices are fixed in the agent. See [repair evidence](../evaluation/Repairs_2026-10-27.md).
+
+The Q05 follow-up accepts three-digit comma groups when numeric conversion is explicitly
+allowed: `1,799.99` becomes `1799.99`. A period is the decimal point. Bad comma grouping
+is rejected with the original row number and column; missing values are not filled.
+The planner must supply the actual `rules` argument even when the same rules appear in
+the job text. Both DAG and statically known Python arguments are checked before execution;
+the shared tool boundary still checks actual values. See
+[Q05 repair](../evaluation/Q05_Repair_2026-10-27.md).
 
 The design below retains broader goals for later versions; discovered tool schemas define
 the current contract. Unchecked checklist items are not claims of completed coverage.
@@ -52,8 +66,7 @@ Use the shared conservative retry hints until complete receipt handling is prove
 | `job` | Required assigned subtask; checked against the saved job. |
 | `dataset` | Required registered CSV reference belonging to this run. |
 | `profile` | Optional registered JSON result from a relevant earlier check. Verify its input hash matches this dataset. |
-| `rules` | Typed task rules for missing values, duplicate handling, formats, allowed changes, and columns that must be preserved. |
-| `options` | Limits on output size, detailed change records, and supported operations. |
+| `rules` | Required explicit typed rules for missing values, duplicate handling, formats, allowed changes, permitted labels, and columns that must be preserved. |
 
 An empty rule set does not authorize every possible change. When an important rule cannot
 be inferred from the user's instruction, request information or leave that value unchanged

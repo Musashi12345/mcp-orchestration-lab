@@ -10,6 +10,7 @@ from ..orchestration.models import FileRef, OrchestrationError
 @dataclass
 class Outputs:
     tables: list = field(default_factory=list)
+    csv_tables: list = field(default_factory=list)
     documents: list = field(default_factory=list)
     pngs: list = field(default_factory=list)
     reports: list = field(default_factory=list)
@@ -63,8 +64,11 @@ async def collect(run_id, roots, files, *, input_ids=(), max_files=128):
                     with path.open(
                         encoding=info.get("encoding", "utf-8-sig"), newline=""
                     ) as stream:
-                        value.tables.append(
-                            list(csv.DictReader(stream, delimiter=info.get("delimiter", ",")))
+                        reader = csv.DictReader(stream, delimiter=info.get("delimiter", ","))
+                        rows = list(reader)
+                        value.tables.append(rows)
+                        value.csv_tables.append(
+                            {"id": ref.id, "columns": reader.fieldnames, "rows": rows}
                         )
                 elif ref.kind == "png":
                     if not path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):

@@ -3,6 +3,7 @@
 import time
 
 from .models import Limits, OrchestrationError
+from .tokens import token_usage
 
 
 class Budget:
@@ -19,8 +20,10 @@ class Budget:
         return max(0, self.limits.run_seconds - (time.monotonic() - self.started))
 
     def check(self):
-        if not self.remaining or self.tokens > self.limits.max_observed_tokens:
-            raise OrchestrationError("BUDGET_EXHAUSTED", "Run allowance exhausted.")
+        if not self.remaining:
+            raise OrchestrationError("BUDGET_EXHAUSTED", "Run time allowance exhausted.")
+        if self.tokens > self.limits.max_observed_tokens:
+            raise OrchestrationError("BUDGET_EXHAUSTED", "Observed token allowance exhausted.")
 
     def model(self):
         self.check()
@@ -37,13 +40,9 @@ class Budget:
         self.tool_attempts += 1
 
     def observe(self, usage):
-        if not isinstance(usage, dict) or any(
-            type(usage.get(key)) is not int or usage[key] < 0
-            for key in ("input_tokens", "output_tokens")
-        ):
-            self.usage_complete = False
-            return
-        self.tokens += usage["input_tokens"] + usage["output_tokens"]
+        counts = token_usage(usage)
+        self.usage_complete = self.usage_complete and counts["usage_complete"]
+        self.tokens += counts["known_tokens"]
         self.check()
 
     def summary(self):

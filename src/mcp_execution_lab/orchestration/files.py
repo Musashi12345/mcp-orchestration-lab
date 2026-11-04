@@ -81,7 +81,7 @@ class Files:
         if kind == "csv":
             staged = self.directory(run_id) / (identity("staged") + ".csv")
             await self._file_work(run_id, staged, lambda: self._write_new(staged, data), parents)
-            dataset = await self.register_csv(run_id, staged, parents=parents)
+            dataset = await self.register_csv(run_id, staged, parents=parents, origin="generated")
             return dataset.ref
         artifact_id = identity("artifact")
         path = self.directory(run_id) / (artifact_id + "." + kind)
@@ -164,8 +164,17 @@ class Files:
             raise OrchestrationError("FILE_CHANGED", "Saved CSV content changed.")
 
     async def register_csv(
-        self, run_id, source: Path, *, encoding="utf-8-sig", delimiter=",", parents=()
+        self,
+        run_id,
+        source: Path,
+        *,
+        encoding="utf-8-sig",
+        delimiter=",",
+        parents=(),
+        origin="input",
     ):
+        if origin not in {"input", "generated"}:
+            raise ValueError("CSV origin must be input or generated.")
         if source.suffix.lower() != ".csv" or len(delimiter) != 1:
             raise OrchestrationError("CSV_INPUT", "Provide a CSV and a one-character separator.")
         artifact_id = identity("dataset")
@@ -240,6 +249,7 @@ class Files:
             "dataset",
             {
                 "dataset": dataset.model_dump(mode="json"),
+                "origin": origin,
                 "relative_path": destination.relative_to(self.root).as_posix(),
                 "profile_scope": "full_file",
                 "sample_cell_character_limit": 512,

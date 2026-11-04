@@ -9,6 +9,8 @@ from .operations import clean
 
 async def execute(client, job, dataset, rules, profile=None):
     async def work():
+        if not any(rules.model_dump().values()):
+            raise NeedsInput("Supply explicit permitted cleaning rules before choosing operations.")
         table = await client.table(dataset)
         if profile:
             prior = await client.json(profile)
